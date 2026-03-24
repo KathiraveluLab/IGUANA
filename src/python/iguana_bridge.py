@@ -3,8 +3,14 @@ IGUANA Python-Erlang Bridge
 Simulates the Machine Learning Inference Engine sending token probabilities
 to the asynchronous Erlang Supervisor Swarm (iguana_entropy_guard) via ErlPort.
 """
-from erlport.erlterms import Atom # type: ignore
-from erlport.erlang import cast, self # type: ignore
+try:
+    from erlport.erlterms import Atom # type: ignore
+    from erlport.erlang import cast, self # type: ignore
+except ImportError:
+    # Standalone mock for Pytest / Python 3 local execution outside the BEAM
+    Atom = lambda x: x
+    cast = lambda pid, msg: print(f"[MOCK ERLPORT CAST] {pid} <- {msg}")
+    self = lambda: "mock_engine_pid"
 
 ACTIVE_BIAS_VECTOR = None
 GENERATION_HALTED = False
