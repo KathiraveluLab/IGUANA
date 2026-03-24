@@ -16,11 +16,14 @@ jobs:
     runs-on: ubuntu-latest
 
     container:
-      image: erlang:22.0.7
+      image: erlang:26.2
 
     steps:
     - uses: actions/checkout@v4
-    - name: Compile
-      run: rebar3 compile
-    - name: Run tests
-      run: rebar3 do eunit, ct
+    - name: Compile Erlang Guardrail
+      run: erlc src/iguana_entropy_guard.erl
+    - name: Run Native Benchmark Suite
+      run: |
+        cd src/eval
+        erlc benchmark.erl
+        erl -noshell -s benchmark run -s init stop
