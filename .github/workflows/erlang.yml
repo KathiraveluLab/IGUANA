@@ -20,8 +20,12 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - name: Compile Erlang Guardrail
-      run: erlc src/iguana_entropy_guard.erl
+    - name: Install rebar3
+      run: curl -fsSL https://s3.amazonaws.com/rebar3/rebar3 -o /usr/local/bin/rebar3 && chmod +x /usr/local/bin/rebar3
+    - name: Fetch Dependencies
+      run: rebar3 get-deps
+    - name: Compile all Erlang Sources
+      run: rebar3 compile
     - name: Run Native Benchmark Suite
       run: |
         cd src/eval
