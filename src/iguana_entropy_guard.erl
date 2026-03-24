@@ -53,6 +53,9 @@ handle_cast({evaluate_entropy, EnginePid, Probabilities}, State) ->
             %% Model is confident, do nothing (fire and forget)
             {noreply, State}
     end;
+handle_cast({set_trust_threshold, Threshold}, State) ->
+    io:format("[IGUANA_GUARD] Context shifted. Adapting entropy threshold to ~p~n", [Threshold]),
+    {noreply, State#state{entropy_threshold = Threshold}};
 handle_cast(_Msg, State) ->
     {noreply, State}.
 

@@ -6,6 +6,9 @@ to the asynchronous Erlang Supervisor Swarm (iguana_entropy_guard) via ErlPort.
 from erlport.erlterms import Atom # type: ignore
 from erlport.erlang import cast, self # type: ignore
 
+ACTIVE_BIAS_VECTOR = None
+GENERATION_HALTED = False
+
 def send_activation_state(probabilities):
     """
     Called after the PyTorch/TensorFlow forward pass.
@@ -43,10 +46,37 @@ def handle_guardrail_message(message):
             print("[PYTHON INFERENCE] Erlang Guardrail issued a hard veto. Halting generation.")
             halt_generation()
 
+def get_adjusted_logits(original_logits):
+    """
+    Applies the active dynamic bias vector (SkewPNN constraint) to the output logits.
+    """
+    global ACTIVE_BIAS_VECTOR
+    if ACTIVE_BIAS_VECTOR is not None:
+        # In a real PyTorch implementation, this would be a tensor addition
+        # For this simulation, we assume lists and add element-wise
+        adjusted = [log + bias for log, bias in zip(original_logits, ACTIVE_BIAS_VECTOR)]
+        # Consume the bias (decay mechanism)
+        ACTIVE_BIAS_VECTOR = None
+        return adjusted
+    return original_logits
+
+def update_context_trust(trust_score: float):
+    """
+    Translates a user trust score (0.0 to 1.0) into an entropy threshold.
+    0.0 (Layperson) -> Strict Threshold (1.5)
+    1.0 (Clinician) -> Relaxed Threshold (3.0)
+    Resolves Context Blindness by allowing fluid adjustments per session.
+    """
+    threshold = 1.5 + (trust_score * 1.5)
+    guardrail_server = Atom(b"iguana_entropy_guard")
+    message = (Atom(b"set_trust_threshold"), threshold)
+    cast(guardrail_server, message)
+    print(f"[PYTHON INFERENCE] Context trust set to {trust_score:.2f}. Adjusting Erlang threshold to {threshold:.2f}")
+
 def apply_bias_to_logits(bias_weights):
-    # Simulated PyTorch logit modification (SkewPNN logic application)
-    pass
+    global ACTIVE_BIAS_VECTOR
+    ACTIVE_BIAS_VECTOR = bias_weights
 
 def halt_generation():
-    # Simulated sequence termination
-    pass
+    global GENERATION_HALTED
+    GENERATION_HALTED = True
