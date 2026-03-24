@@ -3,12 +3,18 @@
 
 %% Starts the Python inference GPU process via ErlPort, enforcing Erlang as the orchestrator
 start_inference_engine(ModelName) ->
-    %% Start the Python node, dynamically setting the pythonpath to the integration directory
-    {ok, P} = python:start([{python, "python3"}, {python_path, "src"}]),
-    
+    %% Resolve the Python worker directory relative to the current working directory.
+    %% After restructuring, all Python modules reside in src/python/.
+    PythonPath = filename:join([code:priv_dir_opt(iguana, "src/python"), "src/python"]),
+    EffectivePath = case filelib:is_dir(PythonPath) of
+        true  -> PythonPath;
+        false -> "src/python"   %% fallback for CI / dev environments without a release
+    end,
+    {ok, P} = python:start([{python, "python3"}, {python_path, EffectivePath}]),
+
     %% Instruct Python to asynchronously boot the Heavy LLM into GPU memory (VRAM)
     python:cast(P, iguana_hf_runner, load_model, [ModelName]),
-    
+
     %% Return the PID of the active Python pipeline worker to the Erlang Swarm
     {ok, P}.
 

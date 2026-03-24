@@ -4,6 +4,6 @@
   {registered, [iguana_entropy_guard, iguana_sup]},
   {mod, {iguana_app, []}},
   {modules, [iguana_app, iguana_sup, iguana_entropy_guard, iguana_hf_controller]},
-  {applications, [kernel, stdlib]},
+  {applications, [kernel, stdlib, erlport]},
   {env, []}
  ]}.
