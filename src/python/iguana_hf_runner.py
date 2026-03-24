@@ -3,7 +3,16 @@ iguana_hf_runner.py
 Executed natively by the Erlang Master Node via ErlPort constraints.
 
 This script boots the heavy foundation Neural Network into GPU memory and explicitly
-attaches the compiled Python \projectname\ LogitsProcessor software hook to physical inference.
+attaches the compiled IGUANA LogitsProcessor software hook to physical inference.
+
+Runtime Requirements:
+    - Python >= 3.10
+    - Erlang/OTP >= 26 (invoked via ErlPort from iguana_hf_controller.erl)
+    - PyTorch >= 2.0 with CUDA support (requires physical NVIDIA GPU / VRAM)
+    - Hugging Face `transformers` >= 4.38
+    NOTE: The model loading and generation calls below are commented out for
+    portability. Uncomment them only when running on hardware with sufficient
+    CUDA-capable GPU memory (minimum 14 GB VRAM for a 7B parameter model).
 """
 from transformers import AutoModelForCausalLM, AutoTokenizer, LogitsProcessorList # type: ignore
 import torch
@@ -21,7 +30,8 @@ def load_model(model_id_bytes):
     model_id = model_id_bytes.decode('utf-8')
     print(f"[PYTHON WORKER] Received Erlang Deployment Directive. Booting model: {model_id}")
     
-    # In a physical cluster, this command allocates vast amounts of CUDA GPU memory:
+    # NOTE: Requires physical CUDA-capable GPU with sufficient VRAM (≥14 GB for a 7B model).
+    # Uncomment the lines below when running on a GPU-enabled cluster or workstation:
     # MODEL = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype=torch.float16, device_map="auto")
     # TOKENIZER = AutoTokenizer.from_pretrained(model_id)
     print(f"[PYTHON WORKER] Neural Network '{model_id}' successfully bootstrapped to VRAM.")
@@ -41,10 +51,10 @@ def generate(prompt_bytes):
     # Wrap the IGUANA hook securely into an immutable PyTorch generic list
     processors = LogitsProcessorList([iguana_latency_hook])
     
-    # Initialize Autoregressive Generation Loop
+    # NOTE: Requires physical CUDA GPU. Uncomment to run on GPU-enabled hardware:
     # outputs = MODEL.generate(
-    #     inputs, 
-    #     max_new_tokens=100, 
+    #     inputs,
+    #     max_new_tokens=100,
     #     logits_processor=processors
     # )
     
