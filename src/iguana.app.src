@@ -1,0 +1,7 @@
+{application, iguana,
+ [{description, "IGUANA: Integrated Guardrails for Unbiased and Adaptive Neural Network Architectures"},
+  {vsn, "0.1.0"},
+  {registered, [iguana_entropy_guard]},
+  {applications, [kernel, stdlib]},
+  {env, []}
+ ]}.
