@@ -2,17 +2,14 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, monitor_token/2, set_threshold/1]).
+-export([start_link/0, monitor_token/2, set_threshold/1, get_stats/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -define(SERVER, ?MODULE).
 
--record(state, {
-    entropy_threshold = 2.5 :: float(),
-    active_injections = 0 :: integer()
-}).
+-include("iguana.hrl").
 
 %%%===================================================================
 %%% API
@@ -41,6 +38,9 @@ set_threshold(Threshold) ->
             ok
     end.
 
+get_stats(Pid) ->
+    gen_server:call(Pid, get_stats).
+
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -52,6 +52,8 @@ init([]) ->
 
 handle_call({set_threshold, Threshold}, _From, State) ->
     {reply, ok, State#state{entropy_threshold = Threshold}};
+handle_call(get_stats, _From, State) ->
+    {reply, {ok, State}, State};
 handle_call(_Request, _From, State) ->
     {reply, ok, State}.
 

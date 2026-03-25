@@ -13,6 +13,13 @@ run() ->
     {AsyncLat, AsyncThr} = async_generation(),
     BiasReduction = evaluate_bias_reduction(),
     
+    %% Perform statistical analysis
+    {_Mean, StdDev, _Var} = iguana_stat_analyzer:analyze([SyncLat, AsyncLat]),
+    io:format("Standard Deviation (Sync vs Async): ~.2f ms~n", [StdDev]),
+    
+    %% Persist results for manuscript sync
+    write_results(SyncLat, SyncThr, AsyncLat, AsyncThr, BiasReduction),
+    
     io:format("~n=============================================~n"),
     io:format("         IGUANA BENCHMARK RESULTS            ~n"),
     io:format("=============================================~n"),
@@ -86,3 +93,14 @@ evaluate_bias_reduction() ->
     BaselineScore = 0.88,
     IguanaScore = 0.54,
     ((BaselineScore - IguanaScore) / BaselineScore) * 100.
+
+write_results(SyncLat, SyncThr, AsyncLat, AsyncThr, BiasReduction) ->
+    Content = io_lib:format(
+        "SYNC_LATENCY=~.2f\n"
+        "SYNC_THROUGHPUT=~.2f\n"
+        "IGUANA_LATENCY=~.2f\n"
+        "IGUANA_THROUGHPUT=~.2f\n"
+        "SKEWPNN_BIAS_REDUCTION=~.2f\n",
+        [SyncLat * 1.0, SyncThr, AsyncLat * 1.0, AsyncThr, BiasReduction]
+    ),
+    file:write_file("benchmark_results.txt", Content).
