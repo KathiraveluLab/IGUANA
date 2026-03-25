@@ -61,7 +61,9 @@ entropy_below_threshold_test() ->
 %% shuts down cleanly. Safeguards the runtime from OTP process leaks.
 %%--------------------------------------------------------------------
 gen_server_lifecycle_test() ->
-    %% Start the supervisor as a standalone process
+    %% Start pg (Process Groups) scope for the swarm tests
+    catch pg:start_link(),
+    %% Start the worker as a standalone process
     {ok, Pid} = iguana_entropy_guard:start_link(),
     ?assert(is_pid(Pid)),
 
@@ -80,6 +82,7 @@ gen_server_lifecycle_test() ->
 %% introduced for context blindness resolution.
 %%--------------------------------------------------------------------
 set_trust_threshold_cast_test() ->
+    catch pg:start_link(),
     {ok, Pid} = iguana_entropy_guard:start_link(),
     gen_server:cast(Pid, {set_trust_threshold, 1.8}),
     timer:sleep(50), %% Allow async cast to process

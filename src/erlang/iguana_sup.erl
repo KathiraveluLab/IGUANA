@@ -24,14 +24,16 @@ init([]) ->
         intensity => 5,
         period    => 10
     },
+    %% Create a Swarm of 10 guardrail workers
     ChildSpecs = [
         #{
-            id       => iguana_entropy_guard,
+            id       => {iguana_entropy_guard, N},
             start    => {iguana_entropy_guard, start_link, []},
             restart  => permanent,
             shutdown => 5000,
             type     => worker,
             modules  => [iguana_entropy_guard]
         }
+        || N <- lists:seq(1, 10)
     ],
     {ok, {SupFlags, ChildSpecs}}.

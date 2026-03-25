@@ -19,21 +19,35 @@
 %%%===================================================================
 
 start_link() ->
-    gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
+    gen_server:start_link(?MODULE, [], []).
 
 %% @doc Asynchronously send the probability distribution of the next token to the guardrail
 %% Probabilities should be a list of floats summing to 1.0.
 monitor_token(EnginePid, Probabilities) ->
-    gen_server:cast(?SERVER, {evaluate_entropy, EnginePid, Probabilities}).
+    case pg:get_members(iguana_swarm) of
+        [] -> {error, no_workers};
+        Members ->
+            %% Pick a random worker from the Swarm (Load Balancing)
+            Worker = lists:nth(rand:uniform(length(Members)), Members),
+            gen_server:cast(Worker, {evaluate_entropy, EnginePid, Probabilities})
+    end.
 
 set_threshold(Threshold) ->
-    gen_server:call(?SERVER, {set_threshold, Threshold}).
+    case pg:get_members(iguana_swarm) of
+        [] -> {error, no_workers};
+        Members ->
+            %% Broadcast update to all workers in the Swarm
+            [gen_server:call(W, {set_threshold, Threshold}) || W <- Members],
+            ok
+    end.
 
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
 
 init([]) ->
+    %% Join the swarm process group
+    pg:join(iguana_swarm, self()),
     {ok, #state{entropy_threshold = 2.5, active_injections = 0}}.
 
 handle_call({set_threshold, Threshold}, _From, State) ->
