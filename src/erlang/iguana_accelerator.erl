@@ -3,9 +3,16 @@
 -on_load(init/0).
 
 init() ->
-    %% Load the NIF shared library
-    Path = filename:join([code:priv_dir(iguana), "iguana_nif_accelerator"]),
-    ok = erlang:load_nif(Path, 0).
+    %% Try standard priv, fallback to local src relative paths if in development/test
+    PrivDir = case code:priv_dir(iguana) of
+        {error, bad_name} ->
+            %% Fallback for cases where the app is not fully started or we are in a sub-build
+            Ebin = filename:dirname(code:which(?MODULE)),
+            filename:join([filename:dirname(Ebin), "priv"]);
+        Dir -> Dir
+    end,
+    Path = filename:join([PrivDir, "iguana_nif_accelerator"]),
+    erlang:load_nif(Path, 0).
 
 %% @doc Wrapper for the C-NIF entropy calculation.
 %% If the NIF is not loaded, this will fail.
