@@ -44,14 +44,11 @@ IGUANA/
 │   ├── iguana_entropy_guard_test.erl # EUnit suites
 │   └── iguana_SUITE.erl         # Common Test integration suite
 ├── include/
-│   └── iguana.hrl               # Shared record and state definitions
-├── _paper/                      # LaTeX manuscript
-│   ├── main.tex                 # Peer-reviewed publication source
-│   └── sync_results.erl         # Empirical data synchronization script
-├── Makefile                     # Native NIF build system
+│   └── iguana.hrl               # Shared record definitions
+├── Makefile                     # Native NIF build system (Linux/macOS)
 ├── rebar.config                 # rebar3 orchestration config
 └── priv/
-    └── iguana_nif_accelerator.so # Hardware-accelerated binary
+    └── iguana_nif_accelerator.* # Hardware-accelerated binaries
 ```
 
 ## Setup
