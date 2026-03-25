@@ -1,5 +1,5 @@
 -module(iguana_stat_analyzer).
--export([analyze/1, confidence_interval/2]).
+-export([analyze/1, confidence_interval/2, report/1]).
 
 %% @doc Analyzes a list of latencies and returns {Mean, StdDev, Variance}
 analyze(Latencies) when is_list(Latencies), length(Latencies) > 0 ->
