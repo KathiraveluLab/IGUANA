@@ -27,11 +27,13 @@ IGUANA/
 │   │   ├── iguana_meta_guard.erl # Context Broker (Dynamic Thresholds)
 │   │   ├── iguana_entropy_guard.erl # Parallel safety actors
 │   │   ├── iguana_accelerator.erl # NIF harness for hardware acceleration
-│   │   ├── iguana_nif_accelerator.c # SIMD-optimized C-NIF kernel
-│   │   ├── iguana_cli.erl       # Unified command-line interface
-│   │   ├── iguana_stat_analyzer.erl # Native statistical profiling
-│   │   ├── iguana_swarm_dashboard.erl # Real-time swarm monitoring
+│   │   ├── iguana_cli.erl        # Unified command-line interface
+│   │   ├── iguana_stat_analyzer.erl # Statistical profiling
+│   │   ├── iguana_swarm_dashboard.erl # Swarm monitoring
 │   │   └── iguana_hf_controller.erl # RLHF/Inference relay
+│   ├── c/                       # Native C sources (SIMD Accelerated)
+│   │   ├── iguana_nif_accelerator.c # Primary hardware kernel
+│   │   └── iguana_nif.c          # Alternative entropy logic
 │   ├── python/                  # Python GPU worker sources
 │   │   ├── iguana_bridge.py     # Python-to-Erlang bridge
 │   │   ├── iguana_hf_runner.py  # Hugging Face model runner
@@ -55,11 +57,20 @@ IGUANA/
 ## Setup
 
 ### 1. Compile Native Components
-IGUANA utilizes hardware acceleration via a C-NIF. Compile the shared library before starting the BEAM:
+IGUANA utilizes hardware acceleration via a C-NIF. On Linux/macOS, use the included Makefile:
 
 ```bash
 make
 ```
+
+On Windows, or using `rebar3` directly (requires the `pc` plugin and a C compiler like MSVC or GCC in the path):
+
+```bash
+rebar3 compile
+```
+
+> [!TIP]
+> **Robustness**: IGUANA features an automatic fallback mechanism. If the native C-NIF cannot be loaded, the system seamlessly transitions to a pure Erlang functional implementation to ensure safety continuity.
 
 ### 2. Fetch Erlang dependencies and compile
 IGUANA is optimized for Erlang/OTP 25+ and uses `rebar3` for lifecycle management:
