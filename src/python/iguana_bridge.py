@@ -1,88 +1,105 @@
 """
 IGUANA Python-Erlang Bridge
-Simulates the Machine Learning Inference Engine sending token probabilities
-to the asynchronous Erlang Supervisor Swarm (iguana_entropy_guard) via ErlPort.
+Real bidirectional IPC between the Python ML inference engine and the
+Erlang Supervisor Swarm (iguana_entropy_guard) via ErlPort.
+
+Message flow:
+  Python  ->  Erlang: cast({evaluate_entropy, EnginePid, Probs})
+  Erlang  ->  Python: {inject_bias, Weights} | {veto_token, _}
 """
-try:
-    from erlport.erlterms import Atom # type: ignore
-    from erlport.erlang import cast, self # type: ignore
-except ImportError:
-    # Standalone mock for Pytest / Python 3 local execution outside the BEAM
-    Atom = lambda x: x
-    cast = lambda pid, msg: print(f"[MOCK ERLPORT CAST] {pid} <- {msg}")
-    self = lambda: "mock_engine_pid"
+from erlport.erlterms import Atom
+from erlport.erlang import cast, self, set_message_handler
 
-ACTIVE_BIAS_VECTOR = None
-GENERATION_HALTED = False
+# ---------------------------------------------------------------------------
+# Shared mutable state — written by the Erlang→Python callback thread,
+# read by IguanaLogitsProcessor on the PyTorch generation thread.
+# ---------------------------------------------------------------------------
+ACTIVE_BIAS_VECTOR = None   # List[float] | None
+GENERATION_HALTED  = False  # bool
 
-def send_activation_state(probabilities):
+
+# ---------------------------------------------------------------------------
+# Python → Erlang  (called after every forward pass)
+# ---------------------------------------------------------------------------
+
+def send_activation_state(probabilities: list) -> bool:
     """
     Called after the PyTorch/TensorFlow forward pass.
-    Sends the token distribution to the Erlang guardrail supervisor.
+    Dispatches the normalised token-probability distribution to the Erlang
+    guardrail supervisor as a non-blocking cast so inference is never stalled.
     """
-    # The registered name of the gen_server in Erlang
     guardrail_server = Atom(b"iguana_entropy_guard")
-    
-    # EnginePid is the current Erlang process representing this Python instance
     engine_pid = self()
-    
-    # Cast `{evaluate_entropy, EnginePid, Probabilities}` to the Erlang gen_server
     message = (Atom(b"evaluate_entropy"), engine_pid, probabilities)
     cast(guardrail_server, message)
-    
-    # The inference engine does NOT block here. It continues to generate the next token.
-    # This solves the catastrophic generational latency issue defined in RQ1!
+    # Fire-and-forget: the inference engine continues to the next token
+    # without waiting for an Erlang reply — this is the latency win (RQ1).
     return True
 
-def handle_guardrail_message(message):
-    """
-    Asynchronous callback triggered when Erlang sends a message back to Python.
-    """
-    if isinstance(message, tuple) and len(message) == 2:
-        command, payload = message
-        
-        if command == Atom(b"inject_bias"):
-            # A2/SkewPNN Bias Weights received from Erlang Adaptivity Supervisor
-            bias_weights = payload
-            print(f"[PYTHON INFERENCE] Received dynamic bias injection: {bias_weights}")
-            apply_bias_to_logits(bias_weights)
-            
-        elif command == Atom(b"veto_token"):
-            # Strict safety threshold breached (e.g., Toxicity)
-            print("[PYTHON INFERENCE] Erlang Guardrail issued a hard veto. Halting generation.")
-            halt_generation()
 
-def get_adjusted_logits(original_logits):
-    """
-    Applies the active dynamic bias vector (SkewPNN constraint) to the output logits.
-    """
-    global ACTIVE_BIAS_VECTOR
-    if ACTIVE_BIAS_VECTOR is not None:
-        # In a real PyTorch implementation, this would be a tensor addition
-        # For this simulation, we assume lists and add element-wise
-        adjusted = [log + bias for log, bias in zip(original_logits, ACTIVE_BIAS_VECTOR)]
-        # Consume the bias (decay mechanism)
-        ACTIVE_BIAS_VECTOR = None
-        return adjusted
-    return original_logits
+# ---------------------------------------------------------------------------
+# Erlang → Python  (registered as the erlport message handler)
+# ---------------------------------------------------------------------------
 
-def update_context_trust(trust_score: float):
+def handle_guardrail_message(message) -> None:
     """
-    Translates a user trust score (0.0 to 1.0) into an entropy threshold.
-    0.0 (Layperson) -> Strict Threshold (1.5)
-    1.0 (Clinician) -> Relaxed Threshold (3.0)
-    Resolves Context Blindness by allowing fluid adjustments per session.
+    Asynchronous callback invoked by erlport whenever the Erlang supervisor
+    sends a message back to this Python process.  Registered via
+    set_message_handler() at module load in iguana_hf_runner.
+    """
+    global ACTIVE_BIAS_VECTOR, GENERATION_HALTED
+
+    if not (isinstance(message, tuple) and len(message) == 2):
+        return
+
+    command, payload = message
+
+    if command == Atom(b"inject_bias"):
+        # SkewPNN bias weights from the Erlang Adaptivity Supervisor.
+        # Convert the erlport-decoded list to plain Python floats.
+        bias_weights = [float(w) for w in payload]
+        print(f"[PYTHON INFERENCE] Received dynamic bias injection: {bias_weights}")
+        ACTIVE_BIAS_VECTOR = bias_weights
+
+    elif command == Atom(b"veto_token"):
+        # Hard safety veto — stop autoregressive generation immediately.
+        print("[PYTHON INFERENCE] Erlang Guardrail issued a hard veto. Halting generation.")
+        GENERATION_HALTED = True
+
+
+# ---------------------------------------------------------------------------
+# Context-trust adaptation  (Python → Erlang cast)
+# ---------------------------------------------------------------------------
+
+def update_context_trust(trust_score: float) -> None:
+    """
+    Translates a user trust score (0.0–1.0) into an entropy threshold cast
+    to the Erlang entropy guard, resolving the Context Blindness problem.
+
+      0.0 (Layperson)  → strict  threshold 1.5
+      1.0 (Clinician)  → relaxed threshold 3.0
     """
     threshold = 1.5 + (trust_score * 1.5)
     guardrail_server = Atom(b"iguana_entropy_guard")
     message = (Atom(b"set_trust_threshold"), threshold)
     cast(guardrail_server, message)
-    print(f"[PYTHON INFERENCE] Context trust set to {trust_score:.2f}. Adjusting Erlang threshold to {threshold:.2f}")
+    print(
+        f"[PYTHON INFERENCE] Context trust set to {trust_score:.2f}. "
+        f"Adjusting Erlang threshold to {threshold:.2f}"
+    )
 
-def apply_bias_to_logits(bias_weights):
+
+# ---------------------------------------------------------------------------
+# Internal helpers (used by IguanaLogitsProcessor via ACTIVE_BIAS_VECTOR)
+# ---------------------------------------------------------------------------
+
+def apply_bias_to_logits(bias_weights: list) -> None:
+    """Store the Erlang-supplied bias for consumption by the logits processor."""
     global ACTIVE_BIAS_VECTOR
-    ACTIVE_BIAS_VECTOR = bias_weights
+    ACTIVE_BIAS_VECTOR = [float(w) for w in bias_weights]
 
-def halt_generation():
+
+def halt_generation() -> None:
+    """Signal the logits processor to force EOS on the next call."""
     global GENERATION_HALTED
     GENERATION_HALTED = True

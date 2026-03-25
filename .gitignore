@@ -22,3 +22,17 @@ _*/
 .cursor
 .windsurf
 _bmad
+ 
+# IGUANA IPC Temp Files
+tmp_erlport/
+.venv/
+.pytest_cache/
+erlport.tar
+contents.tar.gz
+metadata.config
+CHECKSUM
+README.rst
+VERSION
+priv/python*
+priv/ruby*
+__pycache__/
