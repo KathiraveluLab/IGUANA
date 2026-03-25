@@ -20,16 +20,16 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - name: Set up build environment
+      run: |
+        apt-get update && apt-get install -y build-essential
     - name: Install rebar3
       run: curl -fsSL https://s3.amazonaws.com/rebar3/rebar3 -o /usr/local/bin/rebar3 && chmod +x /usr/local/bin/rebar3
     - name: Fetch Dependencies
       run: rebar3 get-deps
-    - name: Compile all Erlang Sources
+    - name: Build IGUANA (including NIF)
       run: rebar3 compile
     - name: Run EUnit Tests
       run: rebar3 eunit
     - name: Run Native Benchmark Suite
-      run: |
-        cd src/eval
-        erlc benchmark.erl
-        erl -noshell -s benchmark run -s init stop
+      run: rebar3 shell --eval "benchmark:run(), init:stop()."
