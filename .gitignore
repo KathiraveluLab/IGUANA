@@ -25,6 +25,7 @@ _bmad
  
 # IGUANA IPC Temp Files
 tmp_erlport/
+benchmark_results.txt
 .venv/
 .pytest_cache/
 erlport.tar
@@ -35,4 +36,5 @@ README.rst
 VERSION
 priv/python*
 priv/ruby*
+priv/*.so
 __pycache__/

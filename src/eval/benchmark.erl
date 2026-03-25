@@ -1,5 +1,5 @@
 -module(benchmark).
--export([run/0]).
+-export([run/0, test_nif_speed/0]).
 
 -define(NUM_TOKENS, 1000).
 -define(INFERENCE_TIME, 22).      % ~22ms for forward pass
@@ -9,6 +9,8 @@
 run() ->
     io:format("Initializing empirical inference simulation (~p tokens)...~n~n", [?NUM_TOKENS]),
     
+    test_nif_speed(),
+    io:format("~n"),
     {SyncLat, SyncThr} = sync_generation(),
     {AsyncLat, AsyncThr} = async_generation(),
     BiasReduction = evaluate_bias_reduction(),
@@ -104,3 +106,43 @@ write_results(SyncLat, SyncThr, AsyncLat, AsyncThr, BiasReduction) ->
         [SyncLat * 1.0, SyncThr, AsyncLat * 1.0, AsyncThr, BiasReduction]
     ),
     file:write_file("benchmark_results.txt", Content).
+
+test_nif_speed() ->
+    io:format("--- Running Hardware Acceleration (NIF) vs Native Erlang Benchmark ---~n"),
+    Probabilities = [0.1, 0.2, 0.3, 0.4],
+    Iterations = 1000000,
+
+    %% Native Erlang
+    StartErl = erlang:system_time(microsecond),
+    run_erl_loop(Iterations, Probabilities),
+    EndErl = erlang:system_time(microsecond),
+    ErlTime = EndErl - StartErl,
+    io:format("Native Erlang (~p iterations): ~.2f ms~n", [Iterations, ErlTime / 1000.0]),
+
+    %% Hardware Accelerated (NIF)
+    StartNif = erlang:system_time(microsecond),
+    run_nif_loop(Iterations, Probabilities),
+    EndNif = erlang:system_time(microsecond),
+    NifTime = EndNif - StartNif,
+    io:format("Hardware-Accelerated NIF (~p iterations): ~.2f ms~n", [Iterations, NifTime / 1000.0]),
+
+    Speedup = ErlTime / NifTime,
+    io:format("NIF Speedup Factor: ~.2fx~n", [Speedup]),
+    ok.
+
+run_erl_loop(0, _) -> ok;
+run_erl_loop(N, P) ->
+    erl_entropy(P),
+    run_erl_loop(N - 1, P).
+
+run_nif_loop(0, _) -> ok;
+run_nif_loop(N, P) ->
+    iguana_accelerator:accelerated_entropy(P),
+    run_nif_loop(N - 1, P).
+
+erl_entropy(Probabilities) ->
+    lists:foldl(fun(P, Acc) -> 
+        if P > 0.0 -> Acc - (P * math:log2(P));
+           true    -> Acc
+        end
+    end, 0.0, Probabilities).
