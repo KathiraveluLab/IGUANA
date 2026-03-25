@@ -1,0 +1,51 @@
+\documentclass[border=10pt]{standalone}
+\usepackage{tikz}
+\usetikzlibrary{positioning, arrows.meta}
+
+\begin{document}
+\begin{tikzpicture}[
+    font=\sffamily, 
+    >=Stealth, 
+    thick,
+    % Explicit style for component boxes
+    comp/.style={rectangle, rounded corners, draw=black, fill=white, minimum width=3.5cm, minimum height=1.5cm, align=center, inner sep=5pt}
+]
+
+    % --- ERLANG / BEAM LAYER ---
+    % Blue dashed boundary
+    \draw[blue!40, fill=blue!5, dashed, ultra thick, rounded corners] (-1, 1) rectangle (12.8, -5.5);
+    \node at (5.9, 0.5) {\Large \textbf{Erlang/OTP BEAM Runtime}};
+
+    % Component Nodes
+    \node (meta) [comp, fill=green!10] at (2, -1.8) {Meta-Guard\\(Context Broker)};
+    \node (swarm) [comp, fill=blue!10] at (9, -1.8) {Supervisor Swarm\\(10x Actors)};
+    \node (nif) [comp, fill=orange!10] at (9, -4.2) {C-NIF Hardware\\Accelerator};
+
+    % Connections
+    \draw [->, line width=1.5pt] (meta) -- (swarm) node[midway, above, font=\small\bfseries] {Threshold Broadcast};
+    \draw [->, line width=1.5pt] (swarm) -- (nif) node[midway, right, font=\small\bfseries] {NIF Call};
+
+
+    % --- PYTHON / PYTORCH LAYER ---
+    % Red dashed boundary
+    \draw[red!40, fill=red!5, dashed, ultra thick, rounded corners] (-1, -6.5) rectangle (12.8, -13.5);
+    \node at (5.9, -13.0) {\Large \textbf{Python / PyTorch Environment}};
+
+    % Component Nodes (Optimized spacing for arrow length)
+    \node (bridge) [comp, fill=red!10] at (1.0, -10) {ErlPort /\\Python Bridge};
+    \node (model) [comp, fill=purple!10] at (6.5, -10) {Hugging Face\\Model Runner};
+    \node (logits) [comp, fill=yellow!10] at (11.0, -10) {IguanaLogits\\Processor};
+
+    % Connections
+    \draw [->, line width=1.5pt] (bridge) -- (model) node[midway, above, font=\small\bfseries] {Veto/Bias};
+    \draw [->, line width=1.5pt] (model) -- (logits);
+    
+    % Routed Feedback Arrow
+    \draw [->, line width=1.5pt] (logits.south) -- ++(0,-1) -- ++(-10.0,0) node[midway, above, font=\small\bfseries] {Telemetry (Logits)} -- (bridge.south);
+
+    % --- INTER-LAYER CONNECTION ---
+    \draw [->, line width=4pt, double, draw=black!70] (nif.south) -- (nif.south |- bridge.north) 
+        node[midway, right, font=\small\bfseries, align=left, text width=3.5cm, xshift=0.1cm] {Hardware\\Accelerated\\Safety Relay};
+
+\end{tikzpicture}
+\end{document}
