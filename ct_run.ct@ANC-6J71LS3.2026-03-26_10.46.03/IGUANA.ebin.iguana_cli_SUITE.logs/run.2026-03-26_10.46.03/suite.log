@@ -1,0 +1,49 @@
+=== Suite started at 2026-03-26 10:46:03
+=== Starting test, 3 test cases
+=cases         3
+=user          pkathiravelu
+=host          ANC-6J71LS3
+=hosts         ANC-6J71LS3 
+=emulator_vsn  16.0.2
+=emulator      beam
+=otp_release   28
+=started       2026-03-26 10:46:03
+=case          iguana_cli_SUITE:init_per_suite
+=logfile       iguana_cli_suite.init_per_suite.html
+=started       2026-03-26 10:46:03
+=ended         2026-03-26 10:46:03
+=result        ok
+=elapsed       0.001331s
+=case          iguana_cli_SUITE:test_main_usage
+=logfile       iguana_cli_suite.test_main_usage.html
+=started       2026-03-26 10:46:03
+=ended         2026-03-26 10:46:03
+=result        ok
+=elapsed       0.000716s
+=case          iguana_cli_SUITE:test_main_bench
+=logfile       iguana_cli_suite.test_main_bench.html
+=started       2026-03-26 10:46:03
+=ended         2026-03-26 10:48:09
+=result        ok
+=elapsed       126.412492s
+=case          iguana_cli_SUITE:test_main_sync
+=logfile       iguana_cli_suite.test_main_sync.html
+=started       2026-03-26 10:48:09
+=ended         2026-03-26 10:48:09
+=result        ok
+=elapsed       0.094720s
+=case          iguana_cli_SUITE:end_per_suite
+=logfile       iguana_cli_suite.end_per_suite.html
+=started       2026-03-26 10:48:09
+=ended         2026-03-26 10:48:09
+=result        ok
+=elapsed       0.000102s
+=group_time    126.667s
+=== TEST COMPLETE, 3 ok, 0 failed of 3 test cases
+
+=finished      2026-03-26 10:48:09
+=failed        0
+=successful    3
+=user_skipped  0
+=auto_skipped  0
+=elapsed_time  126726041

@@ -20,6 +20,9 @@ init() ->
     end.
 
 %% @doc Wrapper for the C-NIF entropy calculation with Erlang fallback.
+%% Calculates the Shannon entropy of a probability distribution.
+%% Attempts to use C-NIF acceleration if available, otherwise falls back to Erlang.
+-spec accelerated_entropy([float()]) -> float().
 accelerated_entropy(Probabilities) ->
     try
         calculate_entropy_nif(Probabilities)

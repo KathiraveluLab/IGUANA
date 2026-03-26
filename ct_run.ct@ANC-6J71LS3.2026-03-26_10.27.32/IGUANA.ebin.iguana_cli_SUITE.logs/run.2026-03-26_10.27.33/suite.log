@@ -1,0 +1,90 @@
+=== Suite started at 2026-03-26 10:27:33
+=== Starting test, 3 test cases
+=cases         3
+=user          pkathiravelu
+=host          ANC-6J71LS3
+=hosts         ANC-6J71LS3 
+=emulator_vsn  16.0.2
+=emulator      beam
+=otp_release   28
+=started       2026-03-26 10:27:33
+=case          iguana_cli_SUITE:init_per_suite
+=logfile       iguana_cli_suite.init_per_suite.html
+=started       2026-03-26 10:27:33
+=ended         2026-03-26 10:27:33
+=result        ok
+=elapsed       0.001331s
+=case          iguana_cli_SUITE:test_main_usage
+=logfile       iguana_cli_suite.test_main_usage.html
+=started       2026-03-26 10:27:33
+=ended         2026-03-26 10:27:33
+=result        ok
+=elapsed       0.001228s
+=case          iguana_cli_SUITE:test_main_bench
+=logfile       iguana_cli_suite.test_main_bench.html
+=started       2026-03-26 10:27:33
+=ended         2026-03-26 10:27:33
+=result        failed: {undef,
+                           [{iguana_accelerator,accelerated_entropy,
+                                [[0.1,0.2,0.3,0.4]],
+                                []},
+                            {benchmark,run_nif_loop,2,
+                                [{file,"src/eval/benchmark.erl"},{line,140}]},
+                            {benchmark,test_nif_speed,0,
+                                [{file,"src/eval/benchmark.erl"},{line,124}]},
+                            {benchmark,run,0,
+                                [{file,"src/eval/benchmark.erl"},{line,12}]},
+                            {iguana_cli_SUITE,test_main_bench,1,
+                                [{file,"test/iguana_cli_SUITE.erl"},
+                                 {line,24}]},
+                            {test_server,ts_tc,3,
+                                [{file,"test_server.erl"},{line,1796}]},
+                            {test_server,run_test_case_eval1,6,
+                                [{file,"test_server.erl"},{line,1305}]},
+                            {test_server,run_test_case_eval,9,
+                                [{file,"test_server.erl"},{line,1237}]}]}, [{iguana_accelerator,
+                                                                             accelerated_entropy},
+                                                                            {benchmark,
+                                                                             run_nif_loop,
+                                                                             140},
+                                                                            {benchmark,
+                                                                             test_nif_speed,
+                                                                             124},
+                                                                            {benchmark,
+                                                                             run,
+                                                                             12},
+                                                                            {iguana_cli_SUITE,
+                                                                             test_main_bench,
+                                                                             24},
+                                                                            {test_server,
+                                                                             ts_tc,
+                                                                             1796},
+                                                                            {test_server,
+                                                                             run_test_case_eval1,
+                                                                             1305},
+                                                                            {test_server,
+                                                                             run_test_case_eval,
+                                                                             1237}]
+=elapsed       0.094924s
+=== *** FAILED test case 2 of 3 ***
+=case          iguana_cli_SUITE:test_main_sync
+=logfile       iguana_cli_suite.test_main_sync.html
+=started       2026-03-26 10:27:33
+=ended         2026-03-26 10:27:33
+=result        ok
+=elapsed       0.053452s
+=case          iguana_cli_SUITE:end_per_suite
+=logfile       iguana_cli_suite.end_per_suite.html
+=started       2026-03-26 10:27:33
+=ended         2026-03-26 10:27:33
+=result        ok
+=elapsed       0.000102s
+=group_time    0.305s
+=== TEST COMPLETE, 2 ok, 1 failed of 3 test cases
+
+=finished      2026-03-26 10:27:33
+=failed        1
+=successful    2
+=user_skipped  0
+=auto_skipped  0
+=elapsed_time  360652

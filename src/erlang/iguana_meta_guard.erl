@@ -7,22 +7,30 @@
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
+-type domain() :: default | medical | finance | creative | coding.
+-type threshold() :: float().
+
 -record(state, {
-    current_domain = default :: atom(),
-    domain_map = #{} :: map()
+    current_domain = default :: domain(),
+    domain_map = #{} :: #{domain() => threshold()}
 }).
 
 %%%===================================================================
 %%% API
 %%%===================================================================
 
+%% @doc Starts the Meta Guard gen_server.
+-spec start_link() -> {ok, pid()} | {error, term()}.
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 %% @doc Sets the conversation domain and broadcasts the new threshold to the swarm.
+-spec set_domain(domain()) -> ok.
 set_domain(Domain) when is_atom(Domain) ->
     gen_server:cast(?MODULE, {set_domain, Domain}).
 
+%% @doc Retrieves the current active domain from the guard state.
+-spec get_current_domain() -> domain().
 get_current_domain() ->
     gen_server:call(?MODULE, get_current_domain).
 

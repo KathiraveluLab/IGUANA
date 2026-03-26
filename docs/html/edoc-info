@@ -1,0 +1,2 @@
+%% encoding: UTF-8
+{modules,[iguana_accelerator,iguana_entropy_guard,iguana_meta_guard]}.

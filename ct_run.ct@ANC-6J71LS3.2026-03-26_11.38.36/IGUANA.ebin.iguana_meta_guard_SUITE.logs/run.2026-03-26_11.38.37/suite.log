@@ -1,0 +1,101 @@
+=== Suite started at 2026-03-26 11:38:37
+=== Starting test, 4 test cases
+=cases         4
+=user          pkathiravelu
+=host          ANC-6J71LS3
+=hosts         ANC-6J71LS3 
+=emulator_vsn  16.0.2
+=emulator      beam
+=otp_release   28
+=started       2026-03-26 11:38:37
+=case          iguana_meta_guard_SUITE:init_per_suite
+=logfile       iguana_meta_guard_suite.init_per_suite.html
+=started       2026-03-26 11:38:37
+=ended         2026-03-26 11:38:37
+=result        ok
+=elapsed       0.003584s
+=case          iguana_meta_guard_SUITE:test_initial_state
+=logfile       iguana_meta_guard_suite.test_initial_state.html
+=started       2026-03-26 11:38:37
+=ended         2026-03-26 11:38:37
+=result        failed: {noproc,
+                           {gen_server,call,
+                               [iguana_meta_guard,get_current_domain]}}, [{gen_server,
+                                                                           call,
+                                                                           1221},
+                                                                          {iguana_meta_guard_SUITE,
+                                                                           test_initial_state,
+                                                                           21},
+                                                                          {test_server,
+                                                                           ts_tc,
+                                                                           1796},
+                                                                          {test_server,
+                                                                           run_test_case_eval1,
+                                                                           1305},
+                                                                          {test_server,
+                                                                           run_test_case_eval,
+                                                                           1237}]
+=elapsed       0.000000s
+=== *** FAILED test case 1 of 4 ***
+=case          iguana_meta_guard_SUITE:test_domain_shift
+=logfile       iguana_meta_guard_suite.test_domain_shift.html
+=started       2026-03-26 11:38:37
+=ended         2026-03-26 11:38:37
+=result        failed: {'EXIT',
+                           {noproc,
+                               {gen_server,call,
+                                   [pg,
+                                    {join_local,iguana_swarm,<0.134.0>},
+                                    infinity]}}}, unknown_location
+=elapsed       0.000000s
+=== *** FAILED test case 2 of 4 ***
+=case          iguana_meta_guard_SUITE:test_unknown_domain
+=logfile       iguana_meta_guard_suite.test_unknown_domain.html
+=started       2026-03-26 11:38:37
+=ended         2026-03-26 11:38:37
+=result        failed: {noproc,
+                           {gen_server,call,
+                               [iguana_meta_guard,get_current_domain]}}, [{gen_server,
+                                                                           call,
+                                                                           1221},
+                                                                          {iguana_meta_guard_SUITE,
+                                                                           test_unknown_domain,
+                                                                           39},
+                                                                          {test_server,
+                                                                           ts_tc,
+                                                                           1796},
+                                                                          {test_server,
+                                                                           run_test_case_eval1,
+                                                                           1305},
+                                                                          {test_server,
+                                                                           run_test_case_eval,
+                                                                           1237}]
+=elapsed       0.000000s
+=== *** FAILED test case 3 of 4 ***
+=case          iguana_meta_guard_SUITE:test_swarm_broadcast
+=logfile       iguana_meta_guard_suite.test_swarm_broadcast.html
+=started       2026-03-26 11:38:37
+=ended         2026-03-26 11:38:37
+=result        failed: {'EXIT',
+                           {noproc,
+                               {gen_server,call,
+                                   [pg,
+                                    {join_local,iguana_swarm,<0.143.0>},
+                                    infinity]}}}, unknown_location
+=elapsed       0.000000s
+=== *** FAILED test case 4 of 4 ***
+=case          iguana_meta_guard_SUITE:end_per_suite
+=logfile       iguana_meta_guard_suite.end_per_suite.html
+=started       2026-03-26 11:38:37
+=ended         2026-03-26 11:38:37
+=result        ok
+=elapsed       0.000000s
+=group_time    0.193s
+=== TEST COMPLETE, 0 ok, 4 failed of 4 test cases
+
+=finished      2026-03-26 11:38:37
+=failed        4
+=successful    0
+=user_skipped  0
+=auto_skipped  0
+=elapsed_time  266342

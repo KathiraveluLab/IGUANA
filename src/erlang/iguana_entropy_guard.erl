@@ -1,6 +1,8 @@
 -module(iguana_entropy_guard).
 -behaviour(gen_server).
 
+-type probabilities() :: [float()].
+
 %% API
 -export([start_link/0, monitor_token/2, set_threshold/1, get_stats/1]).
 
@@ -15,11 +17,14 @@
 %%% API
 %%%===================================================================
 
+%% @doc Starts a worker in the IGUANA entropy guard swarm.
+-spec start_link() -> {ok, pid()} | {error, term()}.
 start_link() ->
     gen_server:start_link(?MODULE, [], []).
 
-%% @doc Asynchronously send the probability distribution of the next token to the guardrail
+%% @doc Asynchronously send the probability distribution of the next token to the guardrail.
 %% Probabilities should be a list of floats summing to 1.0.
+-spec monitor_token(pid(), probabilities()) -> ok | {error, no_workers}.
 monitor_token(EnginePid, Probabilities) ->
     case pg:get_members(iguana_swarm) of
         [] -> {error, no_workers};
@@ -29,6 +34,8 @@ monitor_token(EnginePid, Probabilities) ->
             gen_server:cast(Worker, {evaluate_entropy, EnginePid, Probabilities})
     end.
 
+%% @doc Globally sets the entropy threshold for all active workers in the swarm.
+-spec set_threshold(float()) -> ok | {error, no_workers}.
 set_threshold(Threshold) ->
     case pg:get_members(iguana_swarm) of
         [] -> {error, no_workers};
@@ -38,6 +45,8 @@ set_threshold(Threshold) ->
             ok
     end.
 
+%% @doc Requests current internal state and statistics from a specific guard pid.
+-spec get_stats(pid()) -> {ok, #state{}}.
 get_stats(Pid) ->
     gen_server:call(Pid, get_stats).
 

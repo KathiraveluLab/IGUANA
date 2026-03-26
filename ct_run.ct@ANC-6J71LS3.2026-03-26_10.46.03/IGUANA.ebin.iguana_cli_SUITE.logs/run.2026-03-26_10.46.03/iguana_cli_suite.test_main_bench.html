@@ -1,0 +1,110 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<title>Test iguana_cli_SUITE:test_main_bench result</title>
+<meta http-equiv="cache-control" content="no-cache"></meta>
+<meta http-equiv="content-type" content="text/html; charset=utf-8"></meta>
+<link rel="stylesheet" href="../../ct_default.css" type="text/css"></link>
+<script type="text/javascript" src="../../jquery-latest.js"></script>
+<script type="text/javascript" src="../../jquery.tablesorter.min.js"></script>
+</head>
+<body>
+
+<a name="top"></a><pre>
+=== Test case: <a href="iguana_cli_suite.src.html#test_main_bench-1">iguana_cli_SUITE:test_main_bench/1</a> (click for source code)
+
+=== Config value:
+
+    [{watchdog,&lt;0.126.0&gt;},
+     {tc_logfile,"c:/IGUANA/ct_run.ct@ANC-6J71LS3.2026-03-26_10.46.03/IGUANA.ebin.iguana_cli_SUITE.logs/run.2026-03-26_10.46.03/iguana_cli_suite.test_main_bench.html"},
+     {tc_group_properties,[]},
+     {tc_group_path,[]},
+     {data_dir,"c:/IGUANA/ebin/iguana_cli_SUITE_data/"},
+     {priv_dir,"c:/IGUANA/ct_run.ct@ANC-6J71LS3.2026-03-26_10.46.03/IGUANA.ebin.iguana_cli_SUITE.logs/run.2026-03-26_10.46.03/log_private/"}]
+
+=== Current directory is "c:/IGUANA/ct_run.ct@ANC-6J71LS3.2026-03-26_10.46.03"
+
+=== Started at 2026-03-26 10:46:03
+
+<br />
+Initializing empirical inference simulation (1000 tokens)...
+
+
+--- Running Hardware Acceleration (NIF) vs Native Erlang Benchmark ---
+
+Native Erlang (1000000 iterations): 78.34 ms
+
+
+</pre>
+<div class="sasl"><pre><b>*** System report during iguana_cli_SUITE:test_main_bench/1 2026-03-26 10:46:03.367 ***</b><a id=e-1 class="link-to-entry" href="#e-1">&#x1f517;</a>
+=WARNING REPORT==== 26-Mar-2026::10:46:03.367000 ===
+NIF not loaded, using Erlang fallback.
+
+
+</pre></div>
+<pre>
+Hardware-Accelerated NIF (1000000 iterations): 215.14 ms
+
+NIF Speedup Factor: 0.36x
+
+
+
+--- Running Synchronous Guardrail Benchmark ---
+
+Total Time: 80.19s
+
+Average Latency: 80.19ms
+
+Throughput: 12.47 tokens/sec
+
+
+--- Running Asynchronous IGUANA Benchmark ---
+
+Total Time: 45.92s
+
+Average Latency: 45.91ms
+
+Throughput: 21.78 tokens/sec
+
+Standard Deviation (Sync vs Async): 17.14 ms
+
+
+=============================================
+
+         IGUANA BENCHMARK RESULTS            
+
+=============================================
+
+Synchronous Latency : 80.19 ms
+
+Synchronous Speed   : 12.47 tokens/sec
+
+IGUANA Latency      : 45.91 ms
+
+IGUANA Speed        : 21.78 tokens/sec
+
+SkewPNN Debiasing   : 38.64% reduction
+
+=============================================
+
+
+<a name="end"></a>
+
+
+=== Ended at 2026-03-26 10:48:09
+=== successfully completed test case
+=== === Returned value: ok
+</pre>
+<center>
+<br /><hr /><p>
+<a href="../../../all_runs.html">Test run history
+</a>  |  <a href="../../../index.html">Top level test index
+</a>  |  <a href="../../../suite.log.latest.html">Latest test result</a>
+</p>
+<div class="copyright">Copyright &copy; 2026 <a href="http://www.erlang.org">Open Telecom Platform</a><br />
+Updated: <!--date-->Thu Mar 26 2026 10:46:03<!--/date--><br />
+</div>
+</center>
+</body>
+</html>
