@@ -39,3 +39,15 @@ priv/python*
 priv/ruby*
 priv/*.so
 __pycache__/
+
+# Common Test & Build Artifacts
+ct_run.ct*/
+rebar3.crashdump
+ebin/
+erl_crash.dump
+all_runs.html
+index.html
+variables-ct*
+jquery-latest.js
+jquery.tablesorter.min.js
+suite.log.latest.html
