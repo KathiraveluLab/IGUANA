@@ -51,3 +51,4 @@ variables-ct*
 jquery-latest.js
 jquery.tablesorter.min.js
 suite.log.latest.html
+ct_log_cache
