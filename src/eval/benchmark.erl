@@ -127,8 +127,8 @@ write_results(SyncLat, SyncThr, AsyncLat, AsyncThr, BiasReduction) ->
 
 test_nif_speed() ->
     io:format("--- Running Hardware Acceleration (NIF) vs Native Erlang Benchmark ---~n"),
-    Probabilities = [0.1, 0.2, 0.3, 0.4],
-    Iterations = 1000000,
+    Probabilities = [1.0/32000.0 || _ <- lists:seq(1, 32000)],
+    Iterations = 1000,
 
     %% Native Erlang
     StartErl = erlang:system_time(microsecond),

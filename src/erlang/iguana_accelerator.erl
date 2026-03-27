@@ -8,14 +8,19 @@ init() ->
         {error, bad_name} ->
             %% Fallback for cases where the app is not fully started or we are in a sub-build
             Ebin = filename:dirname(code:which(?MODULE)),
-            filename:join([filename:dirname(Ebin), "priv"]);
+            AppRoot = filename:dirname(Ebin),
+            %% Check both AppRoot/priv and project_root/priv
+            case filelib:is_dir(filename:join(AppRoot, "priv")) of
+                true -> filename:join(AppRoot, "priv");
+                false -> "priv" %% current dir priv
+            end;
         Dir -> Dir
     end,
     Path = filename:join([PrivDir, "iguana_nif_accelerator"]),
     case erlang:load_nif(Path, 0) of
         ok -> ok;
-        {error, _} -> 
-            error_logger:warning_msg("NIF not loaded, using Erlang fallback.~n"),
+        {error, Reason} -> 
+            error_logger:warning_msg("NIF not loaded (~p), using Erlang fallback.~n", [Reason]),
             ok
     end.
 
@@ -24,8 +29,10 @@ init() ->
 %% Attempts to use C-NIF acceleration if available, otherwise falls back to Erlang.
 -spec accelerated_entropy([float()]) -> float().
 accelerated_entropy(Probabilities) ->
+    %% Pack floats into a native double binary (64-bit) for efficient NIF processing
+    Bin = << <<P:64/float-native>> || P <- Probabilities >>,
     try
-        calculate_entropy_nif(Probabilities)
+        calculate_entropy_nif(Bin)
     catch
         _:_ -> erl_entropy(Probabilities)
     end.
