@@ -169,15 +169,29 @@ calculate_entropy_erl(Probabilities) ->
 
 %% Asynchronously send the debiasing weights back to the inference engine
 inject_skew_normal_bias(EnginePid, Indices) ->
-    %% Section 3.4: SkewPNN bias vector Bt = A2(C) * Phi((x-xi)/omega)
-    %% We generate a corrective vector sized exactly for the Top-K indices.
+    %% Section 3.4/RQ2: SkewPNN bias vector Bt = A2(C) * Phi((x-xi)/omega)
+    %% We generate a soft corrective vector sized exactly for the Top-K indices.
     
     K = length(Indices),
-    %% Generate a synthetic corrective skew (approx of Skew-Normal CDF)
-    %% In production, this would be the calculated Bt vector.
-    BiasVector = [0.15 || _ <- lists:seq(1, K)],
+    %% A2 Contextual scaling factor (simulating adaptive augmentation)
+    A2 = 0.3,
+    %% Center of the correction (the split between high/low probability modes)
+    Xi = K / 2.0,
+    %% Scale factor (spread of the correction)
+    Omega = K / 4.0,
     
-    io:format("[IGUANA_GUARD] Entropy spike detected! Injecting Targeted SkewPNN bias vs ~p tokens~n", [K]),
+    %% Generate the Bias Vector following the Skew-Normal CDF curve
+    BiasVector = [
+        A2 * phi((I - Xi) / Omega)
+        || I <- lists:seq(1, K)
+    ],
     
-    %% Send via Erlang message passing: {inject_bias, Weights, Indices}
+    io:format("[IGUANA_GUARD] Entropy spike detected! Injecting Soft SkewPNN bias vector vs ~p tokens~n", [K]),
+    
+    %% Send via Erlang message passing: {inject_bias, BiasVector, Indices}
     EnginePid ! {inject_bias, BiasVector, Indices}.
+
+%% @doc Standard Normal Cumulative Distribution Function (CDF) approximation.
+-spec phi(float()) -> float().
+phi(Z) ->
+    0.5 * (1.0 + math:erf(Z / math:sqrt(2.0))).
