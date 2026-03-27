@@ -97,20 +97,38 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
-%% Calculate Shannon entropy: -Sum(p * log2(p))
-calculate_entropy(Probabilities) ->
-    %% Attempt to use the Hardware Acceleration layer (C-NIF) as per Section 3.2
-    try 
-        iguana_accelerator:accelerated_entropy(Probabilities)
+%% Calculate Shannon entropy for Top-K + Rest payload
+calculate_entropy(Probabilities) when length(Probabilities) > 0 ->
+    %% The last element is the 'rest' probability mass
+    {TopK, [Rest]} = lists:split(length(Probabilities) - 1, Probabilities),
+    
+    %% 1. Calculate entropy for the high-confidence Top-K mode
+    TopKEntropy = try 
+        iguana_accelerator:accelerated_entropy(TopK)
     catch 
-        _:_ ->
-            %% Fallback to native Erlang implementation if NIF is unavailable
-            calculate_entropy_erl(Probabilities)
-    end.
+        _:_ -> calculate_entropy_erl(TopK)
+    end,
+    
+    %% 2. Approximate entropy for the long-tail 'Rest' mass
+    %% We assume a uniform distribution over the remaining vocabulary (approx 32k)
+    VocabSize = 32000, 
+    K = length(TopK),
+    RestCount = VocabSize - K,
+    
+    RestEntropy = if 
+        Rest > 1.0e-9 ->
+            %% Shannon entropy of uniform distribution: Rest * log2(RestCount / Rest)
+            %% which is Rest * (log2(RestCount) - log2(Rest))
+            Rest * (math:log2(RestCount) - math:log2(Rest));
+        true -> 0.0
+    end,
+    
+    TopKEntropy + RestEntropy;
+calculate_entropy(_) -> 0.0.
 
 calculate_entropy_erl(Probabilities) ->
     lists:foldl(fun(P, Acc) -> 
-        if P > 0.0 -> Acc - (P * math:log2(P));
+        if P > 1.0e-9 -> Acc - (P * math:log2(P));
            true    -> Acc
         end
     end, 0.0, Probabilities).
