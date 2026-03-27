@@ -24,14 +24,31 @@ start_link() ->
 
 %% @doc Asynchronously send the probability distribution of the next token to the guardrail.
 %% Probabilities should be a list of floats summing to 1.0.
--spec monitor_token(pid(), probabilities()) -> ok | {error, no_workers}.
+-spec monitor_token(pid(), probabilities()) -> ok | {error, no_workers | overloaded}.
 monitor_token(EnginePid, Probabilities) ->
     case pg:get_members(iguana_swarm) of
         [] -> {error, no_workers};
         Members ->
-            %% Pick a random worker from the Swarm (Load Balancing)
-            Worker = lists:nth(rand:uniform(length(Members)), Members),
-            gen_server:cast(Worker, {evaluate_entropy, EnginePid, Probabilities})
+            %% Select the least loaded worker to prevent mailbox hotspots
+            %% We use a load-shedding threshold of 100 to protect node stability.
+            MaxMailbox = 100,
+            case find_best_worker(Members, {none, MaxMailbox}) of
+                {ok, Worker} ->
+                    gen_server:cast(Worker, {evaluate_entropy, EnginePid, Probabilities});
+                {error, overloaded} ->
+                    %% Load Shedding: Drop telemetry to preserve system integrity
+                    {error, overloaded}
+            end
+    end.
+
+find_best_worker([], {none, _Limit}) -> {error, overloaded};
+find_best_worker([], {Pid, _Count}) -> {ok, Pid};
+find_best_worker([Pid | T], {BestPid, BestCount}) ->
+    case process_info(Pid, message_queue_len) of
+        {message_queue_len, Len} when Len < BestCount ->
+            find_best_worker(T, {Pid, Len});
+        _ ->
+            find_best_worker(T, {BestPid, BestCount})
     end.
 
 %% @doc Globally sets the entropy threshold for all active workers in the swarm.
@@ -66,16 +83,16 @@ handle_call(get_stats, _From, State) ->
 handle_call(_Request, _From, State) ->
     {reply, ok, State}.
 
-handle_cast({evaluate_entropy, EnginePid, Probabilities}, State) ->
+handle_cast({evaluate_entropy, EnginePid, Indices, Probabilities}, State) ->
     Entropy = calculate_entropy(Probabilities),
     if 
         Entropy > State#state.entropy_threshold ->
             %% The model is statistically confused! (Entropy Spike)
-            %% Action: Inject Skew-Normal Bias to debias the generation
-            inject_skew_normal_bias(EnginePid),
+            %% Action: Inject Skew-Normal Bias specifically for the Mode of the distribution
+            inject_skew_normal_bias(EnginePid, Indices),
             {noreply, State#state{active_injections = State#state.active_injections + 1}};
         true ->
-            %% Model is confident, do nothing (fire and forget)
+            %% Model is confident, do nothing
             {noreply, State}
     end;
 handle_cast({set_trust_threshold, Threshold}, State) ->
@@ -134,24 +151,16 @@ calculate_entropy_erl(Probabilities) ->
     end, 0.0, Probabilities).
 
 %% Asynchronously send the debiasing weights back to the inference engine
-inject_skew_normal_bias(EnginePid) ->
+inject_skew_normal_bias(EnginePid, Indices) ->
     %% Section 3.4: SkewPNN bias vector Bt = A2(C) * Phi((x-xi)/omega)
-    %% Here we implement a normalized approximation of the Skew-Normal CDF
-    %% and cast it back to the Python inference engine to rebalance logits.
+    %% We generate a corrective vector sized exactly for the Top-K indices.
     
-    %% Compute dynamic bias vector based on statistical skewness
-    %% In a production environment, this would involve a matrix multiplication A2 * Phi
-    %% For this implementation, we calculate a 4-dimensional corrective skew vector
-    %% to counteract the Selective Refusal Problem.
-    SkewCoeff = 0.5,
-    BiasVector = [
-        0.15 * SkewCoeff, 
-       -0.35 * (1.0 - SkewCoeff), 
-        0.55 * SkewCoeff, 
-        0.25 * (1.0 - SkewCoeff)
-    ],
+    K = length(Indices),
+    %% Generate a synthetic corrective skew (approx of Skew-Normal CDF)
+    %% In production, this would be the calculated Bt vector.
+    BiasVector = [0.15 || _ <- lists:seq(1, K)],
     
-    io:format("[IGUANA_GUARD] Entropy spike detected! Injecting SkewPNN corrective vector to ~p~n", [EnginePid]),
+    io:format("[IGUANA_GUARD] Entropy spike detected! Injecting Targeted SkewPNN bias vs ~p tokens~n", [K]),
     
-    %% Send via Erlang message passing !
-    EnginePid ! {inject_bias, BiasVector}.
+    %% Send via Erlang message passing: {inject_bias, Weights, Indices}
+    EnginePid ! {inject_bias, BiasVector, Indices}.

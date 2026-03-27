@@ -44,37 +44,33 @@ class IguanaLogitsProcessor(LogitsProcessor):
         probs = torch.nn.functional.softmax(scores, dim=-1)
         
         # Top-K Optimization: To resolve the "Severe Serialization Bottleneck",
-        # we only transmit the top 100 most probable tokens. This captures >99%
-        # of the entropy distribution mode for LLMs while reducing IPC payload by 300x.
+        # we only transmit the top 100 most probable tokens. 
         k = 100
-        topk_probs, _ = torch.topk(probs[0], k)
+        topk_probs, topk_indices = torch.topk(probs[0], k)
         
-        # Convert to list for ErlPort serialization
-        telemetry_payload = topk_probs.tolist()
+        # Convert to lists for ErlPort serialization
+        telemetry_probs = topk_probs.tolist()
+        telemetry_indices = topk_indices.tolist()
         
         # Append the sum of the remaining probability mass ("Rest") as the last element.
-        # This allows the Erlang guard to approximate full Shannon entropy accurately.
-        rest_mass = 1.0 - sum(telemetry_payload)
-        telemetry_payload.append(max(0.0, rest_mass))
+        rest_mass = 1.0 - sum(telemetry_probs)
+        telemetry_probs.append(max(0.0, rest_mass))
         
-        iguana_bridge.send_activation_state(telemetry_payload)
+        # Send both indices and probabilities to Erlang
+        iguana_bridge.send_activation_state(telemetry_indices, telemetry_probs)
         
-        # 3. Stateful Bias Adjustment (SkewPNN implementation)
+        # 3. Targeted Bias Adjustment (SkewPNN implementation)
         # Verify if an asynchronous bias tensor was transmitted from the Erlang actors
-        # during previous generations.
-        if iguana_bridge.ACTIVE_BIAS_VECTOR is not None:
-            # Cast the Erlang payload to a corresponding float tensor
-            bias_tensor = torch.tensor(iguana_bridge.ACTIVE_BIAS_VECTOR, device=scores.device)
+        if iguana_bridge.ACTIVE_BIAS_VECTOR is not None and iguana_bridge.ACTIVE_BIAS_INDICES is not None:
+            weights = torch.tensor(iguana_bridge.ACTIVE_BIAS_VECTOR, device=scores.device)
+            target_indices = torch.tensor(iguana_bridge.ACTIVE_BIAS_INDICES, device=scores.device)
             
-            # Execute element-wise tensor addition to gently rebalance the generation logits
-            if bias_tensor.size(0) < scores.size(-1):
-                padded_bias = torch.zeros(scores.size(-1), device=scores.device)
-                padded_bias[:bias_tensor.size(0)] = bias_tensor
-                scores += padded_bias
-            else:
-                scores += bias_tensor[:scores.size(-1)]
+            # Scatter the bias weights only to the specific target indices
+            # This ensures mathematical correctness for any vocabulary size.
+            scores[0, target_indices] += weights
             
-            # Flush the matrix to decay the bias constraint natively
+            # Flush state
             iguana_bridge.ACTIVE_BIAS_VECTOR = None
+            iguana_bridge.ACTIVE_BIAS_INDICES = None
             
         return scores
