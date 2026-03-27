@@ -23,6 +23,7 @@ class IguanaLogitsProcessor(LogitsProcessor):
                              Hugging Face model tokenizer (e.g., 2 for LLaMA).
         """
         self.eos_token_id = eos_token_id
+        self.vocab_initialized = False
         print(f"[IGUANA HOOK] Initialized LogitsProcessor. Guardrail EOS tied to ID: {self.eos_token_id}")
 
     def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor) -> torch.FloatTensor:
@@ -30,6 +31,12 @@ class IguanaLogitsProcessor(LogitsProcessor):
         Intercepts the unnormalized probability scores across the vocabulary space
         for the upcoming token generation.
         """
+        # 0. One-time Swarm Initialization
+        if not self.vocab_initialized:
+            vocab_size = scores.shape[-1]
+            iguana_bridge.initialize_swarm(vocab_size)
+            self.vocab_initialized = True
+
         # 1. Hardware Terminus Override Check
         if iguana_bridge.GENERATION_HALTED:
             # If the Erlang Supervisor Swarm issued a veto_token command, we must

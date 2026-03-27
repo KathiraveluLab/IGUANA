@@ -4,7 +4,7 @@
 -type probabilities() :: [float()].
 
 %% API
--export([start_link/0, monitor_token/2, set_threshold/1, get_stats/1]).
+-export([start_link/0, monitor_token/3, set_threshold/1, get_stats/1, set_vocab_size/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
@@ -24,8 +24,8 @@ start_link() ->
 
 %% @doc Asynchronously send the probability distribution of the next token to the guardrail.
 %% Probabilities should be a list of floats summing to 1.0.
--spec monitor_token(pid(), probabilities()) -> ok | {error, no_workers | overloaded}.
-monitor_token(EnginePid, Probabilities) ->
+-spec monitor_token(pid(), [integer()], probabilities()) -> ok | {error, no_workers | overloaded}.
+monitor_token(EnginePid, Indices, Probabilities) ->
     case pg:get_members(iguana_swarm) of
         [] -> {error, no_workers};
         Members ->
@@ -34,7 +34,7 @@ monitor_token(EnginePid, Probabilities) ->
             MaxMailbox = 100,
             case find_best_worker(Members, {none, MaxMailbox}) of
                 {ok, Worker} ->
-                    gen_server:cast(Worker, {evaluate_entropy, EnginePid, Probabilities});
+                    gen_server:cast(Worker, {evaluate_entropy, EnginePid, Indices, Probabilities});
                 {error, overloaded} ->
                     %% Load Shedding: Drop telemetry to preserve system integrity
                     {error, overloaded}
@@ -67,6 +67,16 @@ set_threshold(Threshold) ->
 get_stats(Pid) ->
     gen_server:call(Pid, get_stats).
 
+%% @doc Globally sets the vocabulary size for the entropy approximation.
+-spec set_vocab_size(integer()) -> ok | {error, no_workers}.
+set_vocab_size(Size) ->
+    case pg:get_members(iguana_swarm) of
+        [] -> {error, no_workers};
+        Members ->
+            [gen_server:cast(M, {set_vocab_size, Size}) || M <- Members],
+            ok
+    end.
+
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -74,7 +84,7 @@ get_stats(Pid) ->
 init([]) ->
     %% Join the swarm process group
     pg:join(iguana_swarm, self()),
-    {ok, #state{entropy_threshold = 2.5, active_injections = 0}}.
+    {ok, #state{}}.
 
 handle_call({set_threshold, Threshold}, _From, State) ->
     {reply, ok, State#state{entropy_threshold = Threshold}};
@@ -84,7 +94,7 @@ handle_call(_Request, _From, State) ->
     {reply, ok, State}.
 
 handle_cast({evaluate_entropy, EnginePid, Indices, Probabilities}, State) ->
-    Entropy = calculate_entropy(Probabilities),
+    Entropy = calculate_entropy(Probabilities, State#state.vocab_size),
     if 
         Entropy > State#state.entropy_threshold ->
             %% The model is statistically confused! (Entropy Spike)
@@ -98,6 +108,9 @@ handle_cast({evaluate_entropy, EnginePid, Indices, Probabilities}, State) ->
 handle_cast({set_threshold, Threshold}, State) ->
     %% Context Shift: Apply new domain-specific threshold from Meta-Guard
     {noreply, State#state{entropy_threshold = Threshold}};
+handle_cast({set_vocab_size, Size}, State) ->
+    %% Architectural Initialization: Set model vocabulary size
+    {noreply, State#state{vocab_size = Size}};
 handle_cast({set_trust_threshold, Threshold}, State) ->
     io:format("[IGUANA_GUARD] Context shifted. Adapting entropy threshold to ~p~n", [Threshold]),
     {noreply, State#state{entropy_threshold = Threshold}};
@@ -118,7 +131,7 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 %% Calculate Shannon entropy for Top-K + Rest payload
-calculate_entropy(Probabilities) when length(Probabilities) > 0 ->
+calculate_entropy(Probabilities, VocabSize) when length(Probabilities) > 0 ->
     %% The last element is the 'rest' probability mass
     {TopK, [Rest]} = lists:split(length(Probabilities) - 1, Probabilities),
     
@@ -130,21 +143,22 @@ calculate_entropy(Probabilities) when length(Probabilities) > 0 ->
     end,
     
     %% 2. Approximate entropy for the long-tail 'Rest' mass
-    %% We assume a uniform distribution over the remaining vocabulary (approx 32k)
-    VocabSize = 32000, 
+    %% We assume a uniform distribution over the remaining vocabulary
     K = length(TopK),
-    RestCount = VocabSize - K,
+    RestCount = case VocabSize - K of
+        Count when Count > 0 -> Count;
+        _ -> 1 %% Safeguard for tiny vocabs
+    end,
     
     RestEntropy = if 
         Rest > 1.0e-9 ->
             %% Shannon entropy of uniform distribution: Rest * log2(RestCount / Rest)
-            %% which is Rest * (log2(RestCount) - log2(Rest))
-            Rest * (math:log2(RestCount) - math:log2(Rest));
+            - Rest * (math:log2(Rest / RestCount));
         true -> 0.0
     end,
     
     TopKEntropy + RestEntropy;
-calculate_entropy(_) -> 0.0.
+calculate_entropy(_, _) -> 0.0.
 
 calculate_entropy_erl(Probabilities) ->
     lists:foldl(fun(P, Acc) -> 

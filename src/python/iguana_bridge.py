@@ -20,7 +20,23 @@ GENERATION_HALTED   = False  # bool
 
 
 # ---------------------------------------------------------------------------
-# Python → Erlang  (called after every forward pass)
+# Python → Erlang  (Initialization & Heartbeat)
+# ---------------------------------------------------------------------------
+
+def initialize_swarm(vocab_size: int) -> bool:
+    """
+    Synchronizes the model vocabulary size with the Erlang entropy guards.
+    Ensures accurate Shannon entropy approximation for the 'Rest' mass.
+    """
+    guardrail_server = Atom(b"iguana_entropy_guard")
+    message = (Atom(b"set_vocab_size"), vocab_size)
+    cast(guardrail_server, message)
+    print(f"[PYTHON BRIDGE] Swarm initialized with VocabSize={vocab_size}")
+    return True
+
+
+# ---------------------------------------------------------------------------
+# Python → Erlang  (Per-token telemetry)
 # ---------------------------------------------------------------------------
 
 def send_activation_state(indices: list, probabilities: list) -> bool:
