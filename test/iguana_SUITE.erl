@@ -10,7 +10,8 @@
     tc4_accepted_generation/1,
     tc5_process_lifecycle/1,
     tc6_state_mutation/1,
-    tc7_mathematical_purity/1
+    tc7_mathematical_purity/1,
+    tc8_distributed_handshake/1
 ]).
 
 all() -> [
@@ -20,7 +21,8 @@ all() -> [
     tc4_accepted_generation,
     tc5_process_lifecycle,
     tc6_state_mutation,
-    tc7_mathematical_purity
+    tc7_mathematical_purity,
+    tc8_distributed_handshake
 ].
 
 init_per_suite(Config) ->
@@ -119,4 +121,55 @@ tc7_mathematical_purity(_Config) ->
     %% T(0, 1) = 0.125 (Integration of 1/(2*pi*(1+x^2)) from 0 to 1)
     T01 = iguana_entropy_guard:owens_t(0.0, 1.0),
     true = (T01 > 0.12) and (T01 < 0.13),
+    ok.
+
+%% TC8: Asserts Distributed Swarm Handshake and Threshold Propagation
+tc8_distributed_handshake(_Config) ->
+    %% 1. Ensure the current node is named for distribution
+    case node() of
+        nonode@nohost -> net_kernel:start([master, shortnames]);
+        _ -> ok
+    end,
+    
+    %% Set a deterministic cookie for the test
+    Cookie = iguana_test_cookie,
+    erlang:set_cookie(node(), Cookie),
+    
+    %% 2. Spawn a Peer Node using standard_io for maximum robustness
+    {ok, Peer, SlaveNode} = peer:start_link(#{name => slave,
+                                            connection => standard_io,
+                                            args => ["-setcookie", atom_to_list(Cookie)]}),
+    
+    %% 3. Sync code path and start IGUANA on Peer
+    %% Filter paths to ensure only existing absolute directories are sent
+    Path = [P || P <- code:get_path(), filelib:is_dir(P)],
+    true = peer:call(Peer, code, set_path, [Path]),
+    
+    %% Ensure the slave node can see the master node
+    pong = peer:call(Peer, net_adm, ping, [node()]),
+    timer:sleep(100),
+    
+    {ok, _} = peer:call(Peer, application, ensure_all_started, [iguana]),
+    
+    %% 4. Verify Swarm Membership (10 Local + 10 Remote = 20 total)
+    wait_for_swarm(20, 100),
+    
+    %% 5. Verify Threshold Propagation from Master -> Slave
+    iguana_meta_guard:update_context(medical),
+    timer:sleep(500),
+    
+    %% Check a worker on the slave node
+    Members = pg:get_members(iguana_swarm),
+    SlaveWorkers = [P || P <- Members, node(P) == SlaveNode],
+    case SlaveWorkers of
+        [SlaveWorker | _] ->
+            {ok, State} = rpc:call(SlaveNode, iguana_entropy_guard, get_stats, [SlaveWorker]),
+            %% Medical threshold should be 1.80
+            1.8 = State#state.entropy_threshold;
+        [] ->
+            ct:fail("No workers found on slave node")
+    end,
+    
+    %% Clean up
+    peer:stop(Peer),
     ok.

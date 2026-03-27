@@ -37,4 +37,12 @@ init([]) ->
         type     => worker,
         modules  => [iguana_meta_guard]
     },
-    {ok, {SupFlags, [MetaGuard | ChildSpecs]}}.
+    ClusterManager = #{
+        id       => iguana_cluster_manager,
+        start    => {iguana_cluster_manager, start_link, []},
+        restart  => permanent,
+        shutdown => 5000,
+        type     => worker,
+        modules  => [iguana_cluster_manager]
+    },
+    {ok, {SupFlags, [MetaGuard, ClusterManager | ChildSpecs]}}.

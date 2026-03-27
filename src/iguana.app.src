@@ -3,7 +3,9 @@
   {vsn, "0.1.0"},
   {registered, [iguana_entropy_guard, iguana_sup]},
   {mod, {iguana_app, []}},
-  {modules, [iguana_app, iguana_sup, iguana_entropy_guard, iguana_hf_controller]},
+  {modules, [iguana_app, iguana_sup, iguana_cluster_manager, iguana_entropy_guard, iguana_meta_guard, iguana_hf_controller]},
   {applications, [kernel, stdlib]},
-  {env, []}
+  {env, [
+    {nodes, []} % List of seed nodes for the cluster
+  ]}
  ]}.
