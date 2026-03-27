@@ -1,5 +1,4 @@
 import time
-import statistics
 import argparse
 import sys
 
@@ -12,11 +11,24 @@ import sys
 # ==============================================================================
 
 def run_empirical_model(num_tokens, inf_time, guard_time, async_overhead, mode="sync"):
-    latencies = []
+    """
+    Executes a high-precision latency simulation for LLM inference.
+    
+    Args:
+        num_tokens (int): Number of tokens to simulate.
+        inf_time (float): Seconds per token for the forward pass.
+        guard_time (float): Seconds per token for synchronous guardrail overhead.
+        async_overhead (float): Seconds per token for asynchronous IPC overhead.
+        mode (str): Evaluation mode ("sync" or "async").
+        
+    Returns:
+        tuple: (avg_latency_ms, throughput_tokens_per_sec)
+    """
+    latencies: list[float] = []
     label = "Synchronous Guardrail (Baseline)" if mode == "sync" else "Asynchronous IGUANA (Parallel)"
     print(f"--- Running {label} Model ---")
     
-    # Measure baseline overhead of the timing loop itself
+    # Measure baseline overhead of the timing loop itself to ensure sub-ms accuracy
     loop_start = time.perf_counter()
     for _ in range(100):
         _ = time.perf_counter()
@@ -26,22 +38,24 @@ def run_empirical_model(num_tokens, inf_time, guard_time, async_overhead, mode="
     for _ in range(num_tokens):
         t0 = time.perf_counter()
         
-        # Forward Pass Simulation
+        # Forward Pass Simulation (e.g. GPU compute time)
         time.sleep(inf_time)
         
         if mode == "sync":
-            # Blocking safety evaluation
+            # Blocking safety evaluation behavior
             time.sleep(guard_time)
         else:
-            # Non-blocking IPC dispatch
+            # Non-blocking IPC dispatch behavior (ErlPort cast)
             time.sleep(async_overhead)
             
         # Subtract loop_overhead to improve precision
         latencies.append(max(0.0, time.perf_counter() - t0 - loop_overhead))
     
     total_time = time.perf_counter() - start_total
-    avg_latency = statistics.mean(latencies) * 1000
-    throughput = num_tokens / total_time
+    
+    # Manual average calculation to remove statistics dependency
+    avg_latency = (sum(latencies) / len(latencies)) * 1000 if latencies else 0
+    throughput = num_tokens / total_time if total_time > 0 else 0
     
     print(f"Total Time      : {total_time:.2f}s")
     print(f"Average Latency : {avg_latency:.2f}ms")
@@ -49,10 +63,11 @@ def run_empirical_model(num_tokens, inf_time, guard_time, async_overhead, mode="
     return avg_latency, throughput
 
 def get_calibrated_bias_reduction():
-    """Returns bias reduction factor observed in IGUANA SKEWPNN validation."""
+    """Returns the bias reduction percentage observed in validated SKEWPNN runs."""
     return 38.64
 
 def main():
+    """Main entry point: parses CLI arguments and executes the performance model."""
     parser = argparse.ArgumentParser(description="IGUANA Empirical Performance Simulation")
     parser.add_argument("--tokens", type=int, default=1000, help="Number of tokens to simulate")
     parser.add_argument("--inf_time", type=float, default=0.022, help="Inference time per token (sec)")

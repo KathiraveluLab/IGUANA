@@ -1,4 +1,7 @@
 -module(benchmark).
+
+%% @doc IGUANA performance modeling suite.
+%% Harmonized with the Python Digital Twin simulation for cross-platform validation.
 -export([run/0, run/1, test_nif_speed/0]).
 
 %% ==============================================================================
@@ -14,9 +17,11 @@
 -define(SYNC_GUARDRAIL_TIME, 45). % ~45ms for synchronous safety evaluation
 -define(ASYNC_OVERHEAD, 2).       % ~2ms for ErlPort IPC casting (rounded from 1.8ms as sleep takes int)
 
+%% @doc Default entry point using standard constants.
 run() ->
     run(#{}).
 
+%% @doc Parameterized entry point for custom token counts or configs.
 run(Config) ->
     NumTokens = maps:get(tokens, Config, ?NUM_TOKENS),
     io:format("Initializing IGUANA Empirical Performance Simulation (~p tokens)...~n", [NumTokens]),
