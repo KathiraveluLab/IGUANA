@@ -1,71 +1,50 @@
 -module(iguana_meta_guard).
 -behaviour(gen_server).
 
-%% API
--export([start_link/0, set_domain/1, get_current_domain/0]).
-
-%% gen_server callbacks
+-export([start_link/0, update_context/1, get_current_threshold/0]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
--type domain() :: default | medical | finance | creative | coding.
--type threshold() :: float().
-
 -record(state, {
-    current_domain = default :: domain(),
-    domain_map = #{} :: #{domain() => threshold()}
+    current_domain = creative :: atom(),
+    current_threshold = 3.5 :: float()
 }).
 
-%%%===================================================================
-%%% API
-%%%===================================================================
-
-%% @doc Starts the Meta Guard gen_server.
--spec start_link() -> {ok, pid()} | {error, term()}.
+%% @doc Starts the Meta-Guard broker.
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
-%% @doc Sets the conversation domain and broadcasts the new threshold to the swarm.
--spec set_domain(domain()) -> ok.
-set_domain(Domain) when is_atom(Domain) ->
-    gen_server:cast(?MODULE, {set_domain, Domain}).
+%% @doc Updates the architectural context trust score by mapping a domain to its threshold.
+%% Domains: medical (strict), creative (relaxed), general (balanced)
+update_context(Domain) ->
+    gen_server:cast(?MODULE, {update_domain, Domain}).
 
-%% @doc Retrieves the current active domain from the guard state.
--spec get_current_domain() -> domain().
-get_current_domain() ->
-    gen_server:call(?MODULE, get_current_domain).
+%% @doc Returns the active threshold managed by the Meta-Guard.
+get_current_threshold() ->
+    gen_server:call(?MODULE, get_threshold).
 
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
 
 init([]) ->
-    %% Define domain sensitivity map
-    Map = #{
-        default  => 2.5,
-        medical  => 1.8,  % Ultra-sensitive
-        finance  => 2.0,  % High sensitivity
-        creative => 3.5,  % Flexible
-        coding   => 3.0   % Moderate
-    },
-    {ok, #state{current_domain = default, domain_map = Map}}.
+    io:format("[IGUANA_META] Centralized Context Broker initialized.~n"),
+    {ok, #state{}}.
 
-handle_call(get_current_domain, _From, State) ->
-    {reply, State#state.current_domain, State};
-handle_call(_Request, _From, State) ->
-    {reply, ok, State}.
+handle_call(get_threshold, _From, State) ->
+    {reply, State#state.current_threshold, State}.
 
-handle_cast({set_domain, Domain}, State) ->
-    case maps:find(Domain, State#state.domain_map) of
-        {ok, NewThreshold} ->
-            io:format("[IGUANA_META] Context shift detected: ~p. Broadcasting threshold ~p to swarm.~n", 
-                      [Domain, NewThreshold]),
-            broadcast_threshold(NewThreshold),
-            {noreply, State#state{current_domain = Domain}};
-        error ->
-            io:format("[IGUANA_META] Unknown domain: ~p. Maintaining ~p.~n", 
-                      [Domain, State#state.current_domain]),
-            {noreply, State}
-    end;
+handle_cast({update_domain, Domain}, State) ->
+    NewThreshold = map_domain_to_threshold(Domain),
+    io:format("[IGUANA_META] Context shift detected: ~p -> ~p (Threshold: ~.2f)~n", 
+              [State#state.current_domain, Domain, NewThreshold]),
+    
+    %% Section 2.1: Synchronize the Swarm
+    iguana_entropy_guard:set_threshold(NewThreshold),
+    
+    {noreply, State#state{
+        current_domain = Domain,
+        current_threshold = NewThreshold
+    }};
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
@@ -82,6 +61,9 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
-broadcast_threshold(Threshold) ->
-    %% Leverage iguana_entropy_guard's broadcast API
-    iguana_entropy_guard:set_threshold(Threshold).
+map_domain_to_threshold(medical)  -> 1.8;
+map_domain_to_threshold(clinical) -> 1.8;
+map_domain_to_threshold(financial)-> 2.2;
+map_domain_to_threshold(general)  -> 2.8;
+map_domain_to_threshold(creative) -> 3.5;
+map_domain_to_threshold(_)        -> 2.5. %% Default

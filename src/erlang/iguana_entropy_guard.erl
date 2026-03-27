@@ -95,6 +95,9 @@ handle_cast({evaluate_entropy, EnginePid, Indices, Probabilities}, State) ->
             %% Model is confident, do nothing
             {noreply, State}
     end;
+handle_cast({set_threshold, Threshold}, State) ->
+    %% Context Shift: Apply new domain-specific threshold from Meta-Guard
+    {noreply, State#state{entropy_threshold = Threshold}};
 handle_cast({set_trust_threshold, Threshold}, State) ->
     io:format("[IGUANA_GUARD] Context shifted. Adapting entropy threshold to ~p~n", [Threshold]),
     {noreply, State#state{entropy_threshold = Threshold}};

@@ -55,9 +55,7 @@ def handle_guardrail_message(message) -> None:
         # Expected: {inject_bias, Weights, Indices}
         ACTIVE_BIAS_VECTOR = [float(w) for w in message[1]]
         ACTIVE_BIAS_INDICES = [int(i) for i in message[2]]
-        print(f"[PYTHON BRIDGE] Bias injected for {len(ACTIVE_BIAS_INDICES)} tokens.")
-        print(f"[PYTHON INFERENCE] Received dynamic bias injection: {bias_weights}")
-        ACTIVE_BIAS_VECTOR = bias_weights
+        print(f"[PYTHON BRIDGE] Received dynamic bias injection for {len(ACTIVE_BIAS_INDICES)} tokens.")
 
     elif command == Atom(b"veto_token"):
         # Hard safety veto — stop autoregressive generation immediately.
@@ -73,18 +71,23 @@ def update_context_trust(trust_score: float) -> None:
     """
     Translates a user trust score (0.0–1.0) into an entropy threshold cast
     to the Erlang entropy guard, resolving the Context Blindness problem.
-
-      0.0 (Layperson)  → strict  threshold 1.5
-      1.0 (Clinician)  → relaxed threshold 3.0
     """
     threshold = 1.5 + (trust_score * 1.5)
     guardrail_server = Atom(b"iguana_entropy_guard")
     message = (Atom(b"set_trust_threshold"), threshold)
     cast(guardrail_server, message)
-    print(
-        f"[PYTHON INFERENCE] Context trust set to {trust_score:.2f}. "
-        f"Adjusting Erlang threshold to {threshold:.2f}"
-    )
+    print(f"[PYTHON INFERENCE] Context trust set to {trust_score:.2f}. Threshold: {threshold:.2f}")
+
+def update_domain_context(domain: str) -> None:
+    """
+    Switches the architectural context by domain (e.g., 'medical', 'creative').
+    This triggers the Erlang Meta-Guard to broadcast specific thresholds.
+    """
+    meta_guard = Atom(b"iguana_meta_guard")
+    domain_atom = Atom(domain.encode('utf-8'))
+    message = (Atom(b"update_domain"), domain_atom)
+    cast(meta_guard, message)
+    print(f"[PYTHON INFERENCE] Architectural domain switched to: {domain}")
 
 
 # ---------------------------------------------------------------------------
