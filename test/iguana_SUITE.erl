@@ -9,7 +9,8 @@
     tc3_veto_violation/1,
     tc4_accepted_generation/1,
     tc5_process_lifecycle/1,
-    tc6_state_mutation/1
+    tc6_state_mutation/1,
+    tc7_mathematical_purity/1
 ]).
 
 all() -> [
@@ -18,7 +19,8 @@ all() -> [
     tc3_veto_violation,
     tc4_accepted_generation,
     tc5_process_lifecycle,
-    tc6_state_mutation
+    tc6_state_mutation,
+    tc7_mathematical_purity
 ].
 
 init_per_suite(Config) ->
@@ -106,4 +108,15 @@ tc6_state_mutation(_Config) ->
     timer:sleep(100),
     {ok, State2} = iguana_entropy_guard:get_stats(Worker),
     3.5 = State2#state.entropy_threshold,
+    ok.
+
+%% TC7: Asserts Owen's T-function and Skew-Normal CDF mathematical purity.
+tc7_mathematical_purity(_Config) ->
+    %% F(1.0, 2.0) should be ~0.684 based on our Simpson's Rule implementation
+    V = iguana_entropy_guard:skew_normal_cdf(1.0, 2.0),
+    true = (V > 0.68) and (V < 0.69),
+    
+    %% T(0, 1) = 0.125 (Integration of 1/(2*pi*(1+x^2)) from 0 to 1)
+    T01 = iguana_entropy_guard:owens_t(0.0, 1.0),
+    true = (T01 > 0.12) and (T01 < 0.13),
     ok.

@@ -5,7 +5,7 @@
 
 %% API
 -export([start_link/0, monitor_token/3, set_threshold/1, get_stats/1, set_vocab_size/1]).
--export([calculate_entropy/2, phi/1]).
+-export([calculate_entropy/2, skew_normal_cdf/2, owens_t/2]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
@@ -191,9 +191,11 @@ inject_skew_normal_bias(EnginePid, Indices) ->
     %% Scale factor (spread of the correction)
     Omega = K / 4.0,
     
-    %% Generate the Bias Vector following the Skew-Normal CDF curve
+    %% Generate the Bias Vector following the true Skew-Normal CDF curve
+    %% Section 3.4: Bt = A2(C) * [Phi(z) - 2*T(z, alpha)]
+    Alpha = 2.0, %% Shape parameter (skewness)
     BiasVector = [
-        A2 * phi((I - Xi) / Omega)
+        A2 * skew_normal_cdf((I - Xi) / Omega, Alpha)
         || I <- lists:seq(1, K)
     ],
     
@@ -202,7 +204,32 @@ inject_skew_normal_bias(EnginePid, Indices) ->
     %% Send via Erlang message passing: {inject_bias, BiasVector, Indices}
     EnginePid ! {inject_bias, BiasVector, Indices}.
 
-%% @doc Standard Normal Cumulative Distribution Function (CDF) approximation.
--spec phi(float()) -> float().
-phi(Z) ->
+%% @doc Skew-Normal Cumulative Distribution Function (CDF).
+%% F(x; alpha) = Phi(x) - 2 * T(x, alpha)
+-spec skew_normal_cdf(float(), float()) -> float().
+skew_normal_cdf(X, Alpha) ->
+    standard_normal_cdf(X) - 2.0 * owens_t(X, Alpha).
+
+%% @doc Standard Normal Cumulative Distribution Function (CDF).
+-spec standard_normal_cdf(float()) -> float().
+standard_normal_cdf(Z) ->
     0.5 * (1.0 + math:erf(Z / math:sqrt(2.0))).
+
+%% @doc Owen's T-function implementation using Simpson's Rule numerical integration.
+%% T(h, a) = (1/2pi) * integral_0^a [exp(-0.5*h^2*(1+x^2)) / (1+x^2)] dx
+-spec owens_t(float(), float()) -> float().
+owens_t(H, A) ->
+    Steps = 40,
+    Delta = A / Steps,
+    Sum = lists:foldl(fun(I, Acc) ->
+        X = I * Delta,
+        Weight = if (I == 0) or (I == Steps) -> 1;
+                    (I rem 2 == 1) -> 4;
+                    true -> 2
+                 end,
+        Acc + Weight * owens_integrand(X, H)
+    end, 0.0, lists:seq(0, Steps)),
+    (Delta / 3.0) * Sum / (2.0 * math:pi()).
+
+owens_integrand(X, H) ->
+    math:exp(-0.5 * H * H * (1.0 + X * X)) / (1.0 + X * X).
