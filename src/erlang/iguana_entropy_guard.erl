@@ -5,6 +5,7 @@
 
 %% API
 -export([start_link/0, monitor_token/3, set_threshold/1, get_stats/1, set_vocab_size/1]).
+-export([calculate_entropy/2, phi/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
@@ -82,9 +83,19 @@ set_vocab_size(Size) ->
 %%%===================================================================
 
 init([]) ->
-    %% Join the swarm process group
-    pg:join(iguana_swarm, self()),
+    %% Join the swarm process group (Retry if needed)
+    join_swarm(5),
     {ok, #state{}}.
+
+join_swarm(0) ->
+    io:format("[IGUANA_GUARD] CRITICAL: Failed to join swarm after retries.~n");
+join_swarm(N) ->
+    case pg:join(iguana_swarm, self()) of
+        ok -> ok;
+        _ -> 
+            timer:sleep(100),
+            join_swarm(N-1)
+    end.
 
 handle_call({set_threshold, Threshold}, _From, State) ->
     {reply, ok, State#state{entropy_threshold = Threshold}};
