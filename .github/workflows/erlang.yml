@@ -20,16 +20,48 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - name: Set up build environment
+    
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+        
+    - name: Install Python Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install torch transformers erlport
+        
+    - name: Set up Erlang build environment
       run: |
         apt-get update && apt-get install -y build-essential
+        
     - name: Install rebar3
       run: curl -fsSL https://s3.amazonaws.com/rebar3/rebar3 -o /usr/local/bin/rebar3 && chmod +x /usr/local/bin/rebar3
+      
     - name: Fetch Dependencies
       run: rebar3 get-deps
-    - name: Build IGUANA (including NIF)
+      
+    - name: Build IGUANA (including SIMD NIF)
       run: rebar3 compile
-    - name: Run EUnit Tests
-      run: rebar3 eunit
-    - name: Run Native Benchmark Suite
+      
+    - name: Run Static Analysis (Lint & Dialyzer)
+      run: |
+        rebar3 lint
+        rebar3 dialyzer
+        
+    - name: Run Validation Suite (EUnit & Common Test)
+      run: |
+        rebar3 eunit
+        rebar3 ct
+        
+    - name: Run Performance Benchmark
       run: rebar3 shell --eval "benchmark:run(), init:stop()."
+      
+    - name: Upload Test Logs & Artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: iguana-validation-results
+        path: |
+          _build/test/logs/
+          benchmark_results.txt
