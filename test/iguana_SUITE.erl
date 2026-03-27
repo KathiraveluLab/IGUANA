@@ -11,7 +11,8 @@
     tc5_process_lifecycle/1,
     tc6_state_mutation/1,
     tc7_mathematical_purity/1,
-    tc8_distributed_handshake/1
+    tc8_distributed_handshake/1,
+    tc9_adaptive_augmentation/1
 ]).
 
 all() -> [
@@ -22,7 +23,8 @@ all() -> [
     tc5_process_lifecycle,
     tc6_state_mutation,
     tc7_mathematical_purity,
-    tc8_distributed_handshake
+    tc8_distributed_handshake,
+    tc9_adaptive_augmentation
 ].
 
 init_per_suite(Config) ->
@@ -172,4 +174,19 @@ tc8_distributed_handshake(_Config) ->
     
     %% Clean up
     peer:stop(Peer),
+    ok.
+
+tc9_adaptive_augmentation(_Config) ->
+    %% 1. Initial State Check (Default A2 = 0.3)
+    Members = pg:get_members(iguana_swarm),
+    [Worker | _] = Members,
+    {ok, State1} = iguana_entropy_guard:get_stats(Worker),
+    0.3 = State1#state.augmentation_factor,
+    
+    %% 2. Update to High Augmentation (Context Shift)
+    iguana_meta_guard:update_augmentation(0.85),
+    timer:sleep(200),
+    
+    {ok, State2} = iguana_entropy_guard:get_stats(Worker),
+    0.85 = State2#state.augmentation_factor,
     ok.

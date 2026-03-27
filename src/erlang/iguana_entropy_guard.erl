@@ -4,7 +4,7 @@
 -type probabilities() :: [float()].
 
 %% API
--export([start_link/0, monitor_token/3, set_threshold/1, get_stats/1, set_vocab_size/1]).
+-export([start_link/0, monitor_token/3, set_threshold/1, set_augmentation/1, get_stats/1, set_vocab_size/1]).
 -export([calculate_entropy/2, skew_normal_cdf/2, owens_t/2]).
 
 %% gen_server callbacks
@@ -63,6 +63,16 @@ set_threshold(Threshold) ->
             ok
     end.
 
+%% @doc Globally sets the augmentation factor (A2) for all active workers.
+-spec set_augmentation(float()) -> ok | {error, no_workers}.
+set_augmentation(Factor) ->
+    case pg:get_members(iguana_swarm) of
+        [] -> {error, no_workers};
+        Members ->
+            [gen_server:call(W, {set_augmentation, Factor}) || W <- Members],
+            ok
+    end.
+
 %% @doc Requests current internal state and statistics from a specific guard pid.
 -spec get_stats(pid()) -> {ok, #state{}}.
 get_stats(Pid) ->
@@ -99,6 +109,8 @@ join_swarm(N) ->
 
 handle_call({set_threshold, Threshold}, _From, State) ->
     {reply, ok, State#state{entropy_threshold = Threshold}};
+handle_call({set_augmentation, Factor}, _From, State) ->
+    {reply, ok, State#state{augmentation_factor = Factor}};
 handle_call(get_stats, _From, State) ->
     {reply, {ok, State}, State};
 handle_call(_Request, _From, State) ->
@@ -110,7 +122,7 @@ handle_cast({evaluate_entropy, EnginePid, Indices, Probabilities}, State) ->
         Entropy > State#state.entropy_threshold ->
             %% The model is statistically confused! (Entropy Spike)
             %% Action: Inject Skew-Normal Bias specifically for the Mode of the distribution
-            inject_skew_normal_bias(EnginePid, Indices),
+            inject_skew_normal_bias(EnginePid, Indices, State),
             {noreply, State#state{active_injections = State#state.active_injections + 1}};
         true ->
             %% Model is confident, do nothing
@@ -119,6 +131,8 @@ handle_cast({evaluate_entropy, EnginePid, Indices, Probabilities}, State) ->
 handle_cast({set_threshold, Threshold}, State) ->
     %% Context Shift: Apply new domain-specific threshold from Meta-Guard
     {noreply, State#state{entropy_threshold = Threshold}};
+handle_cast({set_augmentation, Factor}, State) ->
+    {noreply, State#state{augmentation_factor = Factor}};
 handle_cast({set_vocab_size, Size}, State) ->
     %% Architectural Initialization: Set model vocabulary size
     {noreply, State#state{vocab_size = Size}};
@@ -179,14 +193,11 @@ calculate_entropy_erl(Probabilities) ->
     end, 0.0, Probabilities).
 
 %% Asynchronously send the debiasing weights back to the inference engine
-inject_skew_normal_bias(EnginePid, Indices) ->
+inject_skew_normal_bias(EnginePid, Indices, State) ->
     %% Section 3.4/RQ2: SkewPNN bias vector Bt = A2(C) * Phi((x-xi)/omega)
     %% We generate a soft corrective vector sized exactly for the Top-K indices.
     
     K = length(Indices),
-    %% A2 Contextual scaling factor (simulating adaptive augmentation)
-    A2 = 0.3,
-    %% Center of the correction (the split between high/low probability modes)
     Xi = K / 2.0,
     %% Scale factor (spread of the correction)
     Omega = K / 4.0,
@@ -194,6 +205,7 @@ inject_skew_normal_bias(EnginePid, Indices) ->
     %% Generate the Bias Vector following the true Skew-Normal CDF curve
     %% Section 3.4: Bt = A2(C) * [Phi(z) - 2*T(z, alpha)]
     Alpha = 2.0, %% Shape parameter (skewness)
+    A2 = State#state.augmentation_factor,
     BiasVector = [
         A2 * skew_normal_cdf((I - Xi) / Omega, Alpha)
         || I <- lists:seq(1, K)

@@ -1,7 +1,7 @@
 -module(iguana_meta_guard).
 -behaviour(gen_server).
 
--export([start_link/0, update_context/1, get_current_threshold/0]).
+-export([start_link/0, update_context/1, update_augmentation/1, get_threshold/0]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -record(state, {
@@ -18,8 +18,13 @@ start_link() ->
 update_context(Domain) ->
     gen_server:cast(?MODULE, {update_domain, Domain}).
 
-%% @doc Returns the active threshold managed by the Meta-Guard.
-get_current_threshold() ->
+%% @doc Updates the global augmentation factor (A2) across the swarm.
+-spec update_augmentation(float()) -> ok.
+update_augmentation(Factor) ->
+    iguana_entropy_guard:set_augmentation(Factor).
+
+%% @doc Returns the current entropy threshold managed by the Meta-Guard.
+get_threshold() ->
     gen_server:call(?MODULE, get_threshold).
 
 %%%===================================================================
