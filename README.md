@@ -123,7 +123,7 @@ rebar3 shell --eval "benchmark:run(), init:stop()."
 - **Meta-Guard**: Intelligent context broker that broadcasts domain-specific thresholds.
 - **Swarm**: Decentralized pool of ten actors providing non-blocking safety telemetry.
 - **Hardware Accelerator**: SIMD-optimized NIF kernel that scales to high-frequency token bursts.
-- **Performance**: achieving a 1.40x speedup over standard functional implementations.
+- **Performance**: achieving a 1.66x speedup over standard functional implementations.
 ```erlang
 application:start(iguana).
 {ok, P} = iguana_hf_controller:start_inference_engine("meta-llama/Llama-2-7b-hf").
