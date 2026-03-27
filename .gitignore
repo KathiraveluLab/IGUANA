@@ -1,5 +1,6 @@
 .eunit
 *.o
+*.d
 *.beam
 *.plt
 erl_crash.dump
@@ -38,6 +39,7 @@ VERSION
 priv/python*
 priv/ruby*
 priv/*.so
+priv/*.dll
 __pycache__/
 
 # Common Test & Build Artifacts
