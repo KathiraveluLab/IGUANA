@@ -71,7 +71,7 @@ def main():
     print("=============================================\n")
     
     # Save the exact numbers to a local text file for LaTeX ingestion
-    with open("benchmark_results.txt", "w") as f:
+    with open("python_benchmark_results.txt", "w") as f:
         f.write(f"SYNC_LATENCY={sync_lat:.2f}\n")
         f.write(f"SYNC_THROUGHPUT={sync_thr:.2f}\n")
         f.write(f"IGUANA_LATENCY={async_lat:.2f}\n")

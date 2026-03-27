@@ -105,7 +105,7 @@ write_results(SyncLat, SyncThr, AsyncLat, AsyncThr, BiasReduction) ->
         "SKEWPNN_BIAS_REDUCTION=~.2f\n",
         [SyncLat * 1.0, SyncThr, AsyncLat * 1.0, AsyncThr, BiasReduction]
     ),
-    file:write_file("benchmark_results.txt", Content).
+    file:write_file("erlang_benchmark_results.txt", Content).
 
 test_nif_speed() ->
     io:format("--- Running Hardware Acceleration (NIF) vs Native Erlang Benchmark ---~n"),

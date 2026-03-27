@@ -28,6 +28,8 @@ Powerhouse/
 # IGUANA IPC Temp Files
 tmp_erlport/
 benchmark_results.txt
+python_benchmark_results.txt
+erlang_benchmark_results.txt
 .venv/
 .pytest_cache/
 erlport.tar
