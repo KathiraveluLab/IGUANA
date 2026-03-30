@@ -1,7 +1,7 @@
 -module(iguana_meta_guard).
 -behaviour(gen_server).
 
--export([start_link/0, update_context/1, update_augmentation/1, get_threshold/0]).
+-export([start_link/0, update_context/1, update_augmentation/1, get_threshold/0, get_current_domain/0]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -record(state, {
@@ -27,6 +27,10 @@ update_augmentation(Factor) ->
 get_threshold() ->
     gen_server:call(?MODULE, get_threshold).
 
+%% @doc Returns the current domain
+get_current_domain() ->
+    gen_server:call(?MODULE, get_domain).
+
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -36,7 +40,9 @@ init([]) ->
     {ok, #state{}}.
 
 handle_call(get_threshold, _From, State) ->
-    {reply, State#state.current_threshold, State}.
+    {reply, State#state.current_threshold, State};
+handle_call(get_domain, _From, State) ->
+    {reply, State#state.current_domain, State}.
 
 handle_cast({update_domain, Domain}, State) ->
     NewThreshold = map_domain_to_threshold(Domain),

@@ -98,15 +98,16 @@ init([]) ->
     join_swarm(5),
     {ok, #state{}}.
 
-join_swarm(0) ->
-    io:format("[IGUANA_GUARD] CRITICAL: Failed to join swarm after retries.~n");
-join_swarm(N) ->
-    case pg:join(iguana_swarm, self()) of
-        ok -> ok;
-        _ ->
+join_swarm(N) when N > 0 ->
+    try pg:join(iguana_swarm, self()) of
+        ok -> ok
+    catch
+        _:_ ->
             timer:sleep(100),
             join_swarm(N-1)
-    end.
+    end;
+join_swarm(0) ->
+    io:format("[IGUANA_GUARD] CRITICAL: Failed to join swarm after retries.~n").
 
 handle_call({set_threshold, Threshold}, _From, State) ->
     {reply, ok, State#state{entropy_threshold = Threshold}};
