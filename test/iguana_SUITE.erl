@@ -37,7 +37,7 @@ wait_for_swarm(Count, 0) ->
 wait_for_swarm(Count, N) ->
     case length(pg:get_members(iguana_swarm)) of
         Count -> ok;
-        _ -> 
+        _ ->
             timer:sleep(100),
             wait_for_swarm(Count, N-1)
     end.
@@ -106,7 +106,7 @@ tc6_state_mutation(_Config) ->
     [Worker | _] = pg:get_members(iguana_swarm),
     {ok, State} = iguana_entropy_guard:get_stats(Worker),
     1.8 = State#state.entropy_threshold,
-    
+
     %% Through Domain switch
     iguana_meta_guard:update_context(creative),
     timer:sleep(100),
@@ -119,7 +119,7 @@ tc7_mathematical_purity(_Config) ->
     %% F(1.0, 2.0) should be ~0.684 based on our Simpson's Rule implementation
     V = iguana_entropy_guard:skew_normal_cdf(1.0, 2.0),
     true = (V > 0.68) and (V < 0.69),
-    
+
     %% T(0, 1) = 0.125 (Integration of 1/(2*pi*(1+x^2)) from 0 to 1)
     T01 = iguana_entropy_guard:owens_t(0.0, 1.0),
     true = (T01 > 0.12) and (T01 < 0.13),
@@ -132,34 +132,34 @@ tc8_distributed_handshake(_Config) ->
         nonode@nohost -> net_kernel:start([master, shortnames]);
         _ -> ok
     end,
-    
+
     %% Set a deterministic cookie for the test
     Cookie = iguana_test_cookie,
     erlang:set_cookie(node(), Cookie),
-    
+
     %% 2. Spawn a Peer Node using standard_io for maximum robustness
     {ok, Peer, SlaveNode} = peer:start_link(#{name => slave,
                                             connection => standard_io,
                                             args => ["-setcookie", atom_to_list(Cookie)]}),
-    
+
     %% 3. Sync code path and start IGUANA on Peer
     %% Filter paths to ensure only existing absolute directories are sent
     Path = [P || P <- code:get_path(), filelib:is_dir(P)],
     true = peer:call(Peer, code, set_path, [Path]),
-    
+
     %% Ensure the slave node can see the master node
     pong = peer:call(Peer, net_adm, ping, [node()]),
     timer:sleep(100),
-    
+
     {ok, _} = peer:call(Peer, application, ensure_all_started, [iguana]),
-    
+
     %% 4. Verify Swarm Membership (10 Local + 10 Remote = 20 total)
     wait_for_swarm(20, 100),
-    
+
     %% 5. Verify Threshold Propagation from Master -> Slave
     iguana_meta_guard:update_context(medical),
     timer:sleep(500),
-    
+
     %% Check a worker on the slave node
     Members = pg:get_members(iguana_swarm),
     SlaveWorkers = [P || P <- Members, node(P) == SlaveNode],
@@ -171,7 +171,7 @@ tc8_distributed_handshake(_Config) ->
         [] ->
             ct:fail("No workers found on slave node")
     end,
-    
+
     %% Clean up
     peer:stop(Peer),
     ok.
@@ -182,11 +182,11 @@ tc9_adaptive_augmentation(_Config) ->
     [Worker | _] = Members,
     {ok, State1} = iguana_entropy_guard:get_stats(Worker),
     0.3 = State1#state.augmentation_factor,
-    
+
     %% 2. Update to High Augmentation (Context Shift)
     iguana_meta_guard:update_augmentation(0.85),
     timer:sleep(200),
-    
+
     {ok, State2} = iguana_entropy_guard:get_stats(Worker),
     0.85 = State2#state.augmentation_factor,
     ok.
