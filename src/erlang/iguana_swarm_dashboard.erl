@@ -19,7 +19,7 @@ display() ->
 print_worker_stats(Pid) ->
     case iguana_entropy_guard:get_stats(Pid) of
         {ok, State} ->
-            io:format(" ~p | ~p | ~p ~n", 
+            io:format(" ~p | ~p | ~p ~n",
                 [Pid, State#state.entropy_threshold, State#state.active_injections]);
         _ ->
             io:format(" ~-15p | ERROR      | ERROR           ~n", [Pid])

@@ -40,12 +40,12 @@ handle_call(get_threshold, _From, State) ->
 
 handle_cast({update_domain, Domain}, State) ->
     NewThreshold = map_domain_to_threshold(Domain),
-    io:format("[IGUANA_META] Context shift detected: ~p -> ~p (Threshold: ~.2f)~n", 
+    io:format("[IGUANA_META] Context shift detected: ~p -> ~p (Threshold: ~.2f)~n",
               [State#state.current_domain, Domain, NewThreshold]),
-    
+
     %% Section 2.1: Synchronize the Swarm
     iguana_entropy_guard:set_threshold(NewThreshold),
-    
+
     {noreply, State#state{
         current_domain = Domain,
         current_threshold = NewThreshold
