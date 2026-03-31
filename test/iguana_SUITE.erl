@@ -129,7 +129,9 @@ tc7_mathematical_purity(_Config) ->
 tc8_distributed_handshake(_Config) ->
     %% 1. Ensure the current node is named for distribution
     case node() of
-        nonode@nohost -> net_kernel:start([master, shortnames]);
+        nonode@nohost ->
+            os:cmd("epmd -daemon"),
+            net_kernel:start([master, shortnames]);
         _ -> ok
     end,
 

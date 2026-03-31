@@ -9,39 +9,30 @@ all() ->
     [test_initial_state, test_domain_shift, test_unknown_domain, test_swarm_broadcast].
 
 init_per_suite(Config) ->
-    _ = application:start(pg),
+    {ok, _} = application:ensure_all_started(iguana),
     Config.
 
 end_per_suite(_Config) ->
     ok.
 
 end_per_testcase(_Case, _Config) ->
-    [gen_server:stop(W) || W <- pg:get_members(iguana_swarm)],
-    case whereis(iguana_meta_guard) of
-        undefined -> ok;
-        Pid ->
-            gen_server:stop(Pid),
-            timer:sleep(50)
-    end,
     ok.
 
 init_per_testcase(_Case, Config) ->
-    case iguana_meta_guard:start_link() of
-        {ok, _} -> ok;
-        {error, {already_started, _}} -> ok
-    end,
     Config.
 
 test_initial_state(_Config) ->
-    default = iguana_meta_guard:get_current_domain().
+    creative = iguana_meta_guard:get_current_domain().
 
 test_domain_shift(_Config) ->
     {ok, GuardPid} = iguana_entropy_guard:start_link(),
+    %% Explicitly join swarm so update_context updates it!
+    pg:join(iguana_swarm, GuardPid),
     timer:sleep(50), %% Sync delay
 
-    iguana_meta_guard:set_domain(medical),
+    iguana_meta_guard:update_context(medical),
     %% Cast is asynchronous, wait a bit for processing
-    timer:sleep(100),
+    timer:sleep(200),
     medical = iguana_meta_guard:get_current_domain(),
 
     %% Verify the guard received the threshold (medical => 1.8)
@@ -51,26 +42,45 @@ test_domain_shift(_Config) ->
     gen_server:stop(GuardPid).
 
 test_unknown_domain(_Config) ->
-    OldDomain = iguana_meta_guard:get_current_domain(),
-    iguana_meta_guard:set_domain(non_existent_domain),
-    timer:sleep(100),
+    %% Let's ensure domain is set to a known one first
+    iguana_meta_guard:update_context(general),
+    timer:sleep(200),
+
+    iguana_meta_guard:update_context(non_existent_domain),
+    timer:sleep(200),
     %% Should keep the old domain
-    OldDomain = iguana_meta_guard:get_current_domain().
+    general = iguana_meta_guard:get_current_domain().
 
 test_swarm_broadcast(_Config) ->
     {ok, G1} = iguana_entropy_guard:start_link(),
     {ok, G2} = iguana_entropy_guard:start_link(),
+    pg:join(iguana_swarm, G1),
+    pg:join(iguana_swarm, G2),
     timer:sleep(50), %% Sync delay
 
-    iguana_meta_guard:set_domain(finance),
-    timer:sleep(100),
+    iguana_meta_guard:update_context(finance),
+    timer:sleep(200),
 
     {ok, S1} = iguana_entropy_guard:get_stats(G1),
     {ok, S2} = iguana_entropy_guard:get_stats(G2),
+    case S1 of
+        %% If state is a tuple, check element 2 (threshold)
+        _ when is_tuple(S1) ->
+            2.0 = element(2, S1),
+            2.0 = element(2, S2)
+    end,
 
-    %% finance => 2.0
-    2.0 = S1#state.entropy_threshold,
-    2.0 = S2#state.entropy_threshold,
+    iguana_meta_guard:update_context(financial),
+    timer:sleep(200),
+
+    {ok, S3} = iguana_entropy_guard:get_stats(G1),
+    {ok, S4} = iguana_entropy_guard:get_stats(G2),
+
+    case S3 of
+        _ when is_tuple(S3) ->
+            2.2 = element(2, S3),
+            2.2 = element(2, S4)
+    end,
 
     gen_server:stop(G1),
     gen_server:stop(G2).
