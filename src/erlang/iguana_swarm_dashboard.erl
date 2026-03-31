@@ -4,7 +4,10 @@
 
 display() ->
     Members = pg:get_members(iguana_swarm),
-    CurrentDomain = iguana_meta_guard:get_current_domain(),
+    CurrentDomain = case whereis(iguana_meta_guard) of
+                        undefined -> unknown;
+                        _ -> iguana_meta_guard:get_current_domain()
+                    end,
     io:format("~n=====================================================~n"),
     io:format("        IGUANA SWARM REAL-TIME DASHBOARD             ~n"),
     io:format("=====================================================~n"),
@@ -17,10 +20,11 @@ display() ->
     io:format(" System State : HEALTHY~n~n").
 
 print_worker_stats(Pid) ->
-    case iguana_entropy_guard:get_stats(Pid) of
+    try iguana_entropy_guard:get_stats(Pid) of
         {ok, State} ->
-            io:format(" ~p | ~p | ~p ~n", 
-                [Pid, State#state.entropy_threshold, State#state.active_injections]);
-        _ ->
+            io:format(" ~p | ~p | ~p ~n",
+                [Pid, State#state.entropy_threshold, State#state.active_injections])
+    catch
+        _:_ ->
             io:format(" ~-15p | ERROR      | ERROR           ~n", [Pid])
     end.

@@ -19,7 +19,7 @@ init() ->
     Path = filename:join([PrivDir, "iguana_nif_accelerator"]),
     case erlang:load_nif(Path, 0) of
         ok -> ok;
-        {error, Reason} -> 
+        {error, Reason} ->
             error_logger:warning_msg("NIF not loaded (~p), using Erlang fallback.~n", [Reason]),
             ok
     end.
@@ -38,7 +38,7 @@ accelerated_entropy(Probabilities) ->
     end.
 
 erl_entropy(Probabilities) ->
-    lists:foldl(fun(P, Acc) -> 
+    lists:foldl(fun(P, Acc) ->
         if P > 0.0 -> Acc - (P * math:log2(P));
            true    -> Acc
         end

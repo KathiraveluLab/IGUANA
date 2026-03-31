@@ -4,7 +4,8 @@
 -type probabilities() :: [float()].
 
 %% API
--export([start_link/0, monitor_token/3, set_threshold/1, set_augmentation/1, get_stats/1, set_vocab_size/1]).
+-export([start_link/0, monitor_token/3, set_threshold/1,
+         set_augmentation/1, get_stats/1, set_vocab_size/1]).
 -export([calculate_entropy/2, skew_normal_cdf/2, owens_t/2]).
 
 %% gen_server callbacks
@@ -97,15 +98,16 @@ init([]) ->
     join_swarm(5),
     {ok, #state{}}.
 
-join_swarm(0) ->
-    io:format("[IGUANA_GUARD] CRITICAL: Failed to join swarm after retries.~n");
-join_swarm(N) ->
-    case pg:join(iguana_swarm, self()) of
-        ok -> ok;
-        _ -> 
+join_swarm(N) when N > 0 ->
+    try pg:join(iguana_swarm, self()) of
+        ok -> ok
+    catch
+        _:_ ->
             timer:sleep(100),
             join_swarm(N-1)
-    end.
+    end;
+join_swarm(0) ->
+    io:format("[IGUANA_GUARD] CRITICAL: Failed to join swarm after retries.~n").
 
 handle_call({set_threshold, Threshold}, _From, State) ->
     {reply, ok, State#state{entropy_threshold = Threshold}};
@@ -118,7 +120,7 @@ handle_call(_Request, _From, State) ->
 
 handle_cast({evaluate_entropy, EnginePid, Indices, Probabilities}, State) ->
     Entropy = calculate_entropy(Probabilities, State#state.vocab_size),
-    if 
+    if
         Entropy > State#state.entropy_threshold ->
             %% The model is statistically confused! (Entropy Spike)
             %% Action: Inject Skew-Normal Bias specifically for the Mode of the distribution
@@ -159,14 +161,14 @@ code_change(_OldVsn, State, _Extra) ->
 calculate_entropy(Probabilities, VocabSize) when length(Probabilities) > 0 ->
     %% The last element is the 'rest' probability mass
     {TopK, [Rest]} = lists:split(length(Probabilities) - 1, Probabilities),
-    
+
     %% 1. Calculate entropy for the high-confidence Top-K mode
-    TopKEntropy = try 
+    TopKEntropy = try
         iguana_accelerator:accelerated_entropy(TopK)
-    catch 
+    catch
         _:_ -> calculate_entropy_erl(TopK)
     end,
-    
+
     %% 2. Approximate entropy for the long-tail 'Rest' mass
     %% We assume a uniform distribution over the remaining vocabulary
     K = length(TopK),
@@ -174,19 +176,19 @@ calculate_entropy(Probabilities, VocabSize) when length(Probabilities) > 0 ->
         Count when Count > 0 -> Count;
         _ -> 1 %% Safeguard for tiny vocabs
     end,
-    
-    RestEntropy = if 
+
+    RestEntropy = if
         Rest > 1.0e-9 ->
             %% Shannon entropy of uniform distribution: Rest * log2(RestCount / Rest)
             - Rest * (math:log2(Rest / RestCount));
         true -> 0.0
     end,
-    
+
     TopKEntropy + RestEntropy;
 calculate_entropy(_, _) -> 0.0.
 
 calculate_entropy_erl(Probabilities) ->
-    lists:foldl(fun(P, Acc) -> 
+    lists:foldl(fun(P, Acc) ->
         if P > 1.0e-9 -> Acc - (P * math:log2(P));
            true    -> Acc
         end
@@ -196,12 +198,12 @@ calculate_entropy_erl(Probabilities) ->
 inject_skew_normal_bias(EnginePid, Indices, State) ->
     %% Section 3.4/RQ2: SkewPNN bias vector Bt = A2(C) * Phi((x-xi)/omega)
     %% We generate a soft corrective vector sized exactly for the Top-K indices.
-    
+
     K = length(Indices),
     Xi = K / 2.0,
     %% Scale factor (spread of the correction)
     Omega = K / 4.0,
-    
+
     %% Generate the Bias Vector following the true Skew-Normal CDF curve
     %% Section 3.4: Bt = A2(C) * [Phi(z) - 2*T(z, alpha)]
     Alpha = 2.0, %% Shape parameter (skewness)
@@ -210,9 +212,10 @@ inject_skew_normal_bias(EnginePid, Indices, State) ->
         A2 * skew_normal_cdf((I - Xi) / Omega, Alpha)
         || I <- lists:seq(1, K)
     ],
-    
-    io:format("[IGUANA_GUARD] Entropy spike detected! Injecting Soft SkewPNN bias vector vs ~p tokens~n", [K]),
-    
+
+    io:format("[IGUANA_GUARD] Entropy spike detected! "
+              "Injecting Soft SkewPNN bias vector vs ~p tokens~n", [K]),
+
     %% Send via Erlang message passing: {inject_bias, BiasVector, Indices}
     EnginePid ! {inject_bias, BiasVector, Indices}.
 
