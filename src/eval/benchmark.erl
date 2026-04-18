@@ -5,7 +5,7 @@
 -export([run/0, run/1, test_nif_speed/0]).
 
 %% ==============================================================================
-%% BMAD Empirical Performance Model (Digital Twin)
+%% IGUANA Empirical Performance Model (Digital Twin)
 %% ==============================================================================
 %% Methodology: This script models inference latency using precision timing 
 %% calibrated against physical IGUANA-Erlang bridge telemetry. 

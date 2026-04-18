@@ -3,7 +3,6 @@
 
 %%====================================================================
 %% Test Suite: IGUANA Entropy Guard Correctness
-%% Author: Thirumalai (Test Architect)
 %%
 %% Validates the core safety claims of the IGUANA framework:
 %%   TC1 - Shannon entropy is calculated correctly
