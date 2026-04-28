@@ -4,7 +4,7 @@
   {registered, [iguana_entropy_guard, iguana_sup]},
   {mod, {iguana_app, []}},
   {modules, [iguana_app, iguana_sup, iguana_cluster_manager, iguana_entropy_guard, iguana_meta_guard, iguana_hf_controller]},
-  {applications, [kernel, stdlib]},
+  {applications, [kernel, stdlib, erlport]},
   {env, [
     {nodes, []} % List of seed nodes for the cluster
   ]}

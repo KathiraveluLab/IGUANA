@@ -17,6 +17,28 @@ from erlport.erlang import cast, self, set_message_handler
 ACTIVE_BIAS_VECTOR  = None   # List[float] | None
 ACTIVE_BIAS_INDICES = None   # List[int] | None
 GENERATION_HALTED   = False  # bool
+GUARDRAIL_PID       = None   # Resolved Erlang PID
+
+def gen_cast(dest, message):
+    """
+    Sends a gen_server cast by wrapping the message in the standard 
+    Erlang {'$gen_cast', Msg} format.
+    """
+    from erlport.erlang import cast
+    cast(dest, (Atom(b"$gen_cast"), message))
+
+def get_guardrail_dest():
+    """
+    Returns the destination for guardrail messages.
+    Resolves the registered name to a PID on the first call to ensure 
+    robust communication across the ErlPort bridge.
+    """
+    global GUARDRAIL_PID
+    if GUARDRAIL_PID is None:
+        from erlport.erlang import call
+        # Remote whereis(iguana_entropy_guard)
+        GUARDRAIL_PID = call(Atom(b"erlang"), Atom(b"whereis"), [Atom(b"iguana_entropy_guard")])
+    return GUARDRAIL_PID
 
 
 # ---------------------------------------------------------------------------
@@ -28,9 +50,9 @@ def initialize_swarm(vocab_size: int) -> bool:
     Synchronizes the model vocabulary size with the Erlang entropy guards.
     Ensures accurate Shannon entropy approximation for the 'Rest' mass.
     """
-    guardrail_server = Atom(b"iguana_entropy_guard")
+    guardrail_server = get_guardrail_dest()
     message = (Atom(b"set_vocab_size"), vocab_size)
-    cast(guardrail_server, message)
+    gen_cast(guardrail_server, message)
     print(f"[PYTHON BRIDGE] Swarm initialized with VocabSize={vocab_size}")
     return True
 
@@ -44,11 +66,11 @@ def send_activation_state(indices: list, probabilities: list) -> bool:
     Called after the PyTorch/TensorFlow forward pass.
     Dispatches the Top-K indices and their probabilities to the Erlang swarm.
     """
-    guardrail_server = Atom(b"iguana_entropy_guard")
+    guardrail_server = get_guardrail_dest()
     engine_pid = self()
     # Payload: (Indices, ProbabilitiesPlustRest)
     message = (Atom(b"evaluate_entropy"), engine_pid, indices, probabilities)
-    cast(guardrail_server, message)
+    gen_cast(guardrail_server, message)
     return True
 
 

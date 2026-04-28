@@ -38,6 +38,7 @@ def register_message_handler():
     from erlport.erlang import set_message_handler
     set_message_handler(iguana_bridge.handle_guardrail_message)
     print("[PYTHON WORKER] erlport message handler registered.")
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -81,7 +82,9 @@ def generate(prompt_bytes):
     outputs = MODEL.generate(
         **inputs,
         max_new_tokens=100,
-        logits_processor=processors
+        logits_processor=processors,
+        do_sample=True,
+        temperature=0.7
     )
     response = TOKENIZER.decode(outputs[0], skip_special_tokens=True)
     print(f"[PYTHON WORKER] Generation complete: {response}")

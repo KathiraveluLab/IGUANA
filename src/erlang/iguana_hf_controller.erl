@@ -14,26 +14,36 @@ start_inference_engine(ModelName) ->
     %% Resolve src/python relative to the application's code path.
     %% code:which/1 gives us the full path of the compiled .beam for this
     %% module; we walk two levels up (ebin -> project root) then into src/python.
-    BeamPath    = code:which(?MODULE),
-    ProjRoot    = filename:dirname(filename:dirname(BeamPath)),
-    PythonPath  = filename:join([ProjRoot, "src", "python"]),
+    BeamPath = code:which(?MODULE),
+    %% We might be in _build/default/lib/iguana/ebin/
+    %% We need to find the real project root where .venv and src/ are.
+    
+    %% Strategy: Look for the 'src' directory by walking up from the beam path.
+    ProjRoot = find_project_root(filename:dirname(BeamPath)),
+    PythonPath = filename:join([ProjRoot, "src", "python"]),
 
-    %% Fallback: if we are running from the source tree without a _build dir
-    %% (e.g., directly via `erl`) use the relative path instead.
     EffectivePath = case filelib:is_dir(PythonPath) of
         true  -> PythonPath;
         false -> "src/python"
     end,
 
-    {ok, P} = python:start([{python, "python3"}, {python_path, EffectivePath}]),
+    %% Detection of local virtual environment (.venv)
+    VenvPython = filename:join([ProjRoot, ".venv", "bin", "python3"]),
+    PythonExe = case filelib:is_file(VenvPython) of
+        true  -> VenvPython;
+        false -> "python3"
+    end,
+
+    {ok, P} = python:start([{python, PythonExe}, {python_path, EffectivePath}]),
 
     %% Register the message handler on the Python side BEFORE any cast
     %% arrives so no Erlang message is lost.  python:call/4 is synchronous
     %% and blocks until Python returns — safe here at startup.
-    ok = python:call(P, iguana_hf_runner, register_message_handler, []),
+    true = python:call(P, iguana_hf_runner, register_message_handler, []),
 
     %% Boot the model asynchronously (cast = non-blocking).
-    python:cast(P, iguana_hf_runner, load_model, [ModelName]),
+    BinaryModel = ensure_binary(ModelName),
+    python:call(P, iguana_hf_runner, load_model, [BinaryModel], [async]),
 
     %% Spawn the Erlang-side receive loop that relays {inject_bias, Weights}
     %% and {veto_token, _} messages from iguana_entropy_guard back to Python.
@@ -47,7 +57,8 @@ start_inference_engine(ModelName) ->
 %% Processor calls iguana_bridge.send_activation_state() on every token step,
 %% which in turn casts {evaluate_entropy, EnginePid, Probs} to iguana_entropy_guard.
 generate_sequence(P, PromptText) ->
-    python:cast(P, iguana_hf_runner, generate, [PromptText]),
+    BinaryPrompt = ensure_binary(PromptText),
+    python:call(P, iguana_hf_runner, generate, [BinaryPrompt], [async]),
     ok.
 
 %% @doc Terminates the Python GPU worker and flushes VRAM.
@@ -79,4 +90,20 @@ receive_loop(P) ->
 
         stop ->
             ok
+    end.
+
+%% @doc Ensures the input is a binary (converts lists/strings).
+ensure_binary(B) when is_binary(B) -> B;
+ensure_binary(L) when is_list(L)   -> list_to_binary(L).
+
+%% @doc Recursively walks up the directory tree to find the project root (containing rebar.config).
+find_project_root("/") -> ".";
+find_project_root(Dir) ->
+    case filelib:is_file(filename:join(Dir, "rebar.config")) of
+        true  -> Dir;
+        false ->
+            Parent = filename:dirname(Dir),
+            if Parent == Dir -> "."; %% Reached root
+               true -> find_project_root(Parent)
+            end
     end.

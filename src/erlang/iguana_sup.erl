@@ -21,7 +21,7 @@ init([]) ->
     ChildSpecs = [
         #{
             id       => {iguana_entropy_guard, N},
-            start    => {iguana_entropy_guard, start_link, []},
+            start    => {iguana_entropy_guard, start_link, [if N == 1 -> iguana_entropy_guard; true -> undefined end]},
             restart  => permanent,
             shutdown => 5000,
             type     => worker,

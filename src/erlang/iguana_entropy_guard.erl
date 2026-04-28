@@ -4,7 +4,7 @@
 -type probabilities() :: [float()].
 
 %% API
--export([start_link/0, monitor_token/3, set_threshold/1,
+-export([start_link/0, start_link/1, monitor_token/3, set_threshold/1,
          set_augmentation/1, get_stats/1, set_vocab_size/1]).
 -export([calculate_entropy/2, skew_normal_cdf/2, owens_t/2]).
 
@@ -23,6 +23,13 @@
 -spec start_link() -> {ok, pid()} | {error, term()}.
 start_link() ->
     gen_server:start_link(?MODULE, [], []).
+
+%% @doc Starts a worker and registers it locally.
+-spec start_link(atom()) -> {ok, pid()} | {error, term()}.
+start_link(undefined) ->
+    start_link();
+start_link(Name) ->
+    gen_server:start_link({local, Name}, ?MODULE, [], []).
 
 %% @doc Asynchronously send the probability distribution of the next token to the guardrail.
 %% Probabilities should be a list of floats summing to 1.0.
@@ -122,12 +129,11 @@ handle_cast({evaluate_entropy, EnginePid, Indices, Probabilities}, State) ->
     Entropy = calculate_entropy(Probabilities, State#state.vocab_size),
     if
         Entropy > State#state.entropy_threshold ->
-            %% The model is statistically confused! (Entropy Spike)
-            %% Action: Inject Skew-Normal Bias specifically for the Mode of the distribution
+            io:format("[IGUANA_GUARD] Entropy spike detected! "
+                      "Injecting Soft SkewPNN bias vector vs ~p tokens~n", [length(Indices)]),
             inject_skew_normal_bias(EnginePid, Indices, State),
             {noreply, State#state{active_injections = State#state.active_injections + 1}};
         true ->
-            %% Model is confident, do nothing
             {noreply, State}
     end;
 handle_cast({set_threshold, Threshold}, State) ->

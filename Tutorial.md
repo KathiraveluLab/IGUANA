@@ -14,7 +14,7 @@ rebar3 shell
 Inside the shell, start the application:
 
 ```erlang
-ok = application:start(iguana).
+{ok, _} = application:ensure_all_started(iguana).
 ```
 
 ## 2. Basic Inference with Guardrails
@@ -22,10 +22,10 @@ ok = application:start(iguana).
 IGUANA uses `iguana_hf_controller` to manage the lifecycle of the Python GPU worker and the Hugging Face model.
 
 ### Loading a Model
-Start the inference engine with a specific model ID (e.g., Llama-2-7b).
+Start the inference engine with a specific model ID (e.g., gpt2).
 
 ```erlang
-{ok, P} = iguana_hf_controller:start_inference_engine("meta-llama/Llama-2-7b-hf").
+{ok, P} = iguana_hf_controller:start_inference_engine("gpt2").
 ```
 
 ### Generating Text
@@ -125,6 +125,43 @@ iguana_bridge.update_domain_context("medical")
 # Set a custom trust score (0.0 to 1.0)
 iguana_bridge.update_context_trust(0.8)
 ```
+
+## 8. Verifying the Guardrail Activity
+
+To confirm that IGUANA is actively steering the model, monitor your shell for the following signals:
+
+### Console Logs
+When the swarm detects a high-uncertainty state, it will log:
+`[IGUANA_GUARD] Entropy spike detected! Injecting Soft SkewPNN bias vector...`
+
+This indicates that the Erlang swarm has successfully calculated a corrective bias and sent it back to the Python GPU worker before the next token was chosen.
+
+### Swarm Statistics
+You can inspect the workload and intervention count of the entire swarm at any time:
+```erlang
+iguana_swarm_dashboard:display().
+```
+
+### Contextual Sensitivity
+Change the domain to see the guardrail adapt its sensitivity:
+```erlang
+% Very strict: guards will trigger on minor uncertainty
+iguana_meta_guard:update_context(medical).
+
+% Relaxed: guards will only trigger on extreme uncertainty
+iguana_meta_guard:update_context(creative).
+```
+
+### Manual Stress Test
+If you want to force the guardrail to trigger on almost every token (for testing purposes), set a manually extreme threshold:
+```erlang
+% Set threshold to 0.5 (GPT-2 average entropy is usually > 1.0)
+iguana_entropy_guard:set_threshold(0.5).
+
+% Run a generic prompt
+iguana_hf_controller:generate_sequence(P, "The").
+```
+You should now see a constant stream of `[IGUANA_GUARD] Entropy spike detected!` messages in your terminal.
 
 ---
 
