@@ -1,6 +1,8 @@
 -module(iguana_hf_controller).
 -export([start_inference_engine/1, generate_sequence/2, stop/1, receive_loop/1]).
 
+-dialyzer({nowarn_function, start_inference_engine/1}).
+
 %% ---------------------------------------------------------------------------
 %% Public API
 %% ---------------------------------------------------------------------------
