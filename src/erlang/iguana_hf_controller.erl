@@ -17,7 +17,7 @@ start_inference_engine(ModelName) ->
     BeamPath = code:which(?MODULE),
     %% We might be in _build/default/lib/iguana/ebin/
     %% We need to find the real project root where .venv and src/ are.
-    
+
     %% Strategy: Look for the 'src' directory by walking up from the beam path.
     ProjRoot = find_project_root(filename:dirname(BeamPath)),
     PythonPath = filename:join([ProjRoot, "src", "python"]),
