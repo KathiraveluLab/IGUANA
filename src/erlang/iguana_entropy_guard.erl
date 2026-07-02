@@ -51,7 +51,8 @@ monitor_token(EnginePid, Indices, Probabilities) ->
     end.
 
 %% @doc Synchronously evaluate the entropy of the token distribution.
--spec evaluate_entropy_sync([integer()], probabilities()) -> ok | {inject_bias, [float()], [integer()]} | {veto_token, term()} | {error, term()}.
+-spec evaluate_entropy_sync([integer()], probabilities()) ->
+    ok | {inject_bias, [float()], [integer()]} | {veto_token, term()} | {error, term()}.
 evaluate_entropy_sync(Indices, Probabilities) ->
     case pg:get_members(iguana_swarm) of
         [] -> {error, no_workers};
@@ -153,7 +154,8 @@ handle_call({evaluate_entropy, Indices, Probabilities}, _From, State) ->
                 A2 * skew_normal_cdf((I - Xi) / Omega, Alpha)
                 || I <- lists:seq(1, K)
             ],
-            {reply, {inject_bias, BiasVector, Indices}, State#state{active_injections = State#state.active_injections + 1}};
+            {reply, {inject_bias, BiasVector, Indices},
+             State#state{active_injections = State#state.active_injections + 1}};
         true ->
             {reply, ok, State}
     end;
@@ -165,7 +167,8 @@ handle_cast({evaluate_entropy, EnginePid, Indices, Probabilities}, State) ->
     VetoThreshold = 0.5,
     if
         Entropy < VetoThreshold ->
-            io:format("[IGUANA_GUARD] Hard safety veto triggered! Entropy ~p < ~p~n", [Entropy, VetoThreshold]),
+            io:format("[IGUANA_GUARD] Hard safety veto triggered! Entropy ~p < ~p~n",
+                      [Entropy, VetoThreshold]),
             EnginePid ! {veto_token, low_entropy},
             {noreply, State};
         Entropy > State#state.entropy_threshold ->

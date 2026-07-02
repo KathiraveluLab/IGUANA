@@ -211,6 +211,7 @@ tc10_sync_evaluation(_Config) ->
 
     %% Case 3: High entropy (H(P) = 3.0 > 2.0) -> Expect Bias Injection
     ProbsBias = [0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.0],
-    {inject_bias, BiasVector, [1,2,3,4,5,6,7,8]} = iguana_entropy_guard:evaluate_entropy_sync([1,2,3,4,5,6,7,8], ProbsBias),
+    {inject_bias, BiasVector, [1,2,3,4,5,6,7,8]} =
+        iguana_entropy_guard:evaluate_entropy_sync([1,2,3,4,5,6,7,8], ProbsBias),
     8 = length(BiasVector),
     ok.
