@@ -61,17 +61,23 @@ def initialize_swarm(vocab_size: int) -> bool:
 # Python → Erlang  (Per-token telemetry)
 # ---------------------------------------------------------------------------
 
-def send_activation_state(indices: list, probabilities: list) -> bool:
+def send_activation_state(indices: list, probabilities: list, block: bool = False):
     """
     Called after the PyTorch/TensorFlow forward pass.
     Dispatches the Top-K indices and their probabilities to the Erlang swarm.
+    If block is True, performs a synchronous call and returns the result.
     """
-    guardrail_server = get_guardrail_dest()
-    engine_pid = self()
-    # Payload: (Indices, ProbabilitiesPlustRest)
-    message = (Atom(b"evaluate_entropy"), engine_pid, indices, probabilities)
-    gen_cast(guardrail_server, message)
-    return True
+    if block:
+        from erlport.erlang import call
+        res = call(Atom(b"iguana_entropy_guard"), Atom(b"evaluate_entropy_sync"), [indices, probabilities])
+        return res
+    else:
+        guardrail_server = get_guardrail_dest()
+        engine_pid = self()
+        # Payload: (Indices, ProbabilitiesPlustRest)
+        message = (Atom(b"evaluate_entropy"), engine_pid, indices, probabilities)
+        gen_cast(guardrail_server, message)
+        return True
 
 
 # ---------------------------------------------------------------------------

@@ -12,7 +12,8 @@
     tc6_state_mutation/1,
     tc7_mathematical_purity/1,
     tc8_distributed_handshake/1,
-    tc9_adaptive_augmentation/1
+    tc9_adaptive_augmentation/1,
+    tc10_sync_evaluation/1
 ]).
 
 all() -> [
@@ -24,7 +25,8 @@ all() -> [
     tc6_state_mutation,
     tc7_mathematical_purity,
     tc8_distributed_handshake,
-    tc9_adaptive_augmentation
+    tc9_adaptive_augmentation,
+    tc10_sync_evaluation
 ].
 
 init_per_suite(Config) ->
@@ -131,7 +133,7 @@ tc8_distributed_handshake(_Config) ->
     case node() of
         nonode@nohost ->
             os:cmd("epmd -daemon"),
-            net_kernel:start([master, shortnames]);
+            net_kernel:start([test_master, shortnames]);
         _ -> ok
     end,
 
@@ -140,7 +142,7 @@ tc8_distributed_handshake(_Config) ->
     erlang:set_cookie(node(), Cookie),
 
     %% 2. Spawn a Peer Node using standard_io for maximum robustness
-    {ok, Peer, SlaveNode} = peer:start_link(#{name => slave,
+    {ok, Peer, SlaveNode} = peer:start_link(#{name => test_slave,
                                             connection => standard_io,
                                             args => ["-setcookie", atom_to_list(Cookie)]}),
 
@@ -191,4 +193,24 @@ tc9_adaptive_augmentation(_Config) ->
 
     {ok, State2} = iguana_entropy_guard:get_stats(Worker),
     0.85 = State2#state.augmentation_factor,
+    ok.
+
+%% TC10: Asserts synchronous block-mode token evaluation (veto, accept, inject bias).
+tc10_sync_evaluation(_Config) ->
+    %% Set threshold to 2.0 (veto threshold = 1.0)
+    iguana_entropy_guard:set_threshold(2.0),
+    timer:sleep(100),
+
+    %% Case 1: Low entropy (H(P) = 0.286 < 1.0) -> Expect Veto
+    ProbsVeto = [0.95, 0.05, 0.0, 0.0, 0.0],
+    {veto_token, low_entropy} = iguana_entropy_guard:evaluate_entropy_sync([1,2,3,4], ProbsVeto),
+
+    %% Case 2: Mid entropy (1.0 <= H(P) = 1.58 <= 2.0) -> Expect Accept (ok)
+    ProbsAccept = [0.33, 0.33, 0.34, 0.0, 0.0],
+    ok = iguana_entropy_guard:evaluate_entropy_sync([1,2,3,4], ProbsAccept),
+
+    %% Case 3: High entropy (H(P) = 3.0 > 2.0) -> Expect Bias Injection
+    ProbsBias = [0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.0],
+    {inject_bias, BiasVector, [1,2,3,4,5,6,7,8]} = iguana_entropy_guard:evaluate_entropy_sync([1,2,3,4,5,6,7,8], ProbsBias),
+    8 = length(BiasVector),
     ok.

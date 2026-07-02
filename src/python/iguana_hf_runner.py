@@ -71,11 +71,13 @@ def generate(prompt_bytes):
         print("[PYTHON WORKER] Model not loaded — cannot generate.")
         return
 
+    import os
     prompt = prompt_bytes.decode("utf-8")
-    print(f"[PYTHON WORKER] Initiating sequence generation: '{prompt}'")
+    block_mode = os.environ.get("IGUANA_BLOCK_MODE", "false").lower() == "true"
+    print(f"[PYTHON WORKER] Initiating sequence generation: '{prompt}' (BlockMode: {block_mode})")
 
     eos_token_id    = TOKENIZER.eos_token_id
-    iguana_hook     = IguanaLogitsProcessor(eos_token_id)
+    iguana_hook     = IguanaLogitsProcessor(eos_token_id, block_mode=block_mode)
     processors      = LogitsProcessorList([iguana_hook])
 
     inputs = TOKENIZER(prompt, return_tensors="pt").to(MODEL.device)

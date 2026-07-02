@@ -2,7 +2,7 @@
 
 **Integrated Guardrails for Unbiased and Adaptive Neural Network Architectures**
 
-IGUANA is a polyglot AI safety framework that decouples guardrail evaluation from the sequential forward pass of generative neural networks. An Erlang/OTP Supervisor Swarm evaluates the Shannon entropy of each token distribution concurrently with PyTorch inference, applying SkewPNN soft-bias corrections or hard-veto interrupts without blocking the generation pipeline.
+IGUANA is a polyglot AI safety framework that decouples guardrail evaluation from the sequential forward pass of generative neural networks. An Erlang/OTP Supervisor Swarm evaluates the Shannon entropy of each token distribution concurrently with PyTorch inference, applying SkewPNN soft-bias corrections or hard-veto interrupts.
 
 ## Requirements
 
@@ -26,13 +26,13 @@ IGUANA/
 │   │   ├── iguana_sup.erl       # 10-actor swarm supervisor
 │   │   ├── iguana_meta_guard.erl # Context Broker (Dynamic Thresholds)
 │   │   ├── iguana_entropy_guard.erl # Parallel safety actors
-│   │   ├── iguana_accelerator.erl # NIF harness for hardware acceleration
+│   │   ├── iguana_accelerator.erl # NIF harness for CPU SIMD software acceleration
 │   │   ├── iguana_cli.erl        # Unified command-line interface
 │   │   ├── iguana_stat_analyzer.erl # Statistical profiling
 │   │   ├── iguana_swarm_dashboard.erl # Swarm monitoring
 │   │   └── iguana_hf_controller.erl # RLHF/Inference relay
 │   ├── c/                       # Native C sources (SIMD Accelerated)
-│   │   ├── iguana_nif_accelerator.c # Primary hardware kernel
+│   │   ├── iguana_nif_accelerator.c # Primary native C SIMD vector kernel
 │   │   └── iguana_nif.c          # Alternative entropy logic
 │   ├── python/                  # Python GPU worker sources
 │   │   ├── iguana_bridge.py     # Python-to-Erlang bridge
@@ -48,13 +48,13 @@ IGUANA/
 ├── Makefile                     # Native NIF build system (Linux/macOS)
 ├── rebar.config                 # rebar3 orchestration config
 └── priv/
-    └── iguana_nif_accelerator.* # Hardware-accelerated binaries
+    └── iguana_nif_accelerator.* # SIMD-accelerated binaries
 ```
 
 ## Setup
 
 ### 1. Compile Native Components
-IGUANA utilizes hardware acceleration via a C-NIF. On Linux/macOS, use the included Makefile:
+IGUANA utilizes native software acceleration via a C-NIF targeting CPU-level SIMD vector instructions (AVX2 on x86_64, NEON on ARMv8). On Linux/macOS, use the included Makefile:
 
 ```bash
 make
@@ -70,7 +70,7 @@ rebar3 compile
 > **Robustness**: IGUANA features an automatic fallback mechanism. If the native C-NIF cannot be loaded, the system seamlessly transitions to a pure Erlang functional implementation to ensure safety continuity.
 
 ### 2. Fetch Erlang dependencies and compile
-IGUANA is optimized for Erlang/OTP 25+ and uses `rebar3` for lifecycle management:
+IGUANA is optimized for Erlang/OTP 26+ and uses `rebar3` for lifecycle management:
 
 ```bash
 rebar3 get-deps
@@ -89,7 +89,7 @@ rebar3 ct
 ```
 
 ### 4. Run the Performance Benchmark
-Compare native Erlang performance against the hardware-accelerated NIF:
+Compare native Erlang performance against the SIMD-accelerated NIF:
 
 ```bash
 # Run unified benchmark
@@ -107,7 +107,7 @@ rebar3 shell --eval "benchmark:run(), init:stop()."
 │ └────────────────┘  │   └──────────────┬───────────────┘ │
 │                     │                  │                 │
 │                     │   ┌──────────────▼──────────────┐  │
-│                     └──►│   C-NIF Hardware Accelerator│  │
+│                     └──►│  C-NIF Software Accelerator  │  │
 │                         └──────────────┬──────────────┘  │
 └────────────────────────────────────────┼─────────────────┘
                                          │ ErlPort (Local IPC)
@@ -122,9 +122,27 @@ rebar3 shell --eval "benchmark:run(), init:stop()."
 
 - **Meta-Guard**: Intelligent context broker that broadcasts domain-specific thresholds.
 - **Swarm**: Decentralized pool of ten actors providing non-blocking safety telemetry.
-- **Hardware Accelerator**: SIMD-optimized NIF kernel that scales to high-frequency token bursts.
+- **C-NIF Software Accelerator**: SIMD-optimized native NIF kernel (targeting CPU AVX2/NEON vector instructions) that scales to high-frequency token bursts.
 - **Distributed Cluster**: `iguana_cluster_manager` handles automated node discovery and scale-out safety.
 - **Performance**: Verified **1.75x speedup** and **300x IPC reduction** (via Top-K telemetry).
+
+## Key Telemetry & Enforcement Modes
+
+### 1. Dual-Threshold Safety Enforcement
+- **Hard Veto**: If token distribution entropy falls below `0.5` (extremely low entropy, representing a deterministic policy violation), the guard issues a hard `veto_token` interrupt, forcing the generator to yield an EOS token and halt.
+- **Soft Correction**: If entropy exceeds the context-specific threshold (indicating an entropy spike/uncertainty), the guard injects a SkewPNN bias vector to softly adjust logits pre-softmax.
+- **Accept**: Otherwise, generation is allowed without modification.
+
+### 2. Telemetry Modes: Asynchronous vs. Preventative Block-Mode
+- **Asynchronous (Default)**: Telemetry is cast out-of-band to the swarm, and the GPU inference thread continues to the next forward pass in parallel. To prevent visual leakage on streaming interfaces, a client-side sliding window buffer of size $N=1$ or $2$ tokens can be deployed to intercept safety overrides before they render.
+- **Preventative Block-Mode**: By setting the environment variable `IGUANA_BLOCK_MODE=true`, the PyTorch logits processor blocks synchronously on Erlang evaluation, enforcing absolute zero-leak compliance before returning scores.
+
+### 3. Deployment & Cluster Security
+- **Cloud-Native & Virtualization**: The SIMD vector functions run entirely as standard user-space instructions, making IGUANA native-friendly for containerized environments (Docker/Kubernetes) without requiring special host privileges or GPU pass-through.
+- **Swarm Security**: Node-to-node telemetry and configuration updates are secured via TLS encryption, cookie-based authentication, and private network overlays.
+
+## Sample Usage
+
 ```erlang
 application:start(iguana).
 {ok, P} = iguana_hf_controller:start_inference_engine("meta-llama/Llama-2-7b-hf").
@@ -132,11 +150,9 @@ iguana_hf_controller:generate_sequence(P, <<"Tell me about climate change.">>).
 iguana_hf_controller:stop(P).
 ```
 
-
 - **Erlang master** owns the process lifecycle and safety telemetry.
 - **Python worker** owns the GPU matrix multiplications.
 - **ErlPort** bridges them with sub-2ms IPC overhead.
-
 
 ## Citation
 
