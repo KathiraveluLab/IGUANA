@@ -138,3 +138,8 @@ iguana_hf_controller:stop(P).
 - **ErlPort** bridges them with sub-2ms IPC overhead.
 
 
+## Citation
+
+If you use this work in your research, please cite the following publication:
+
+* Kathiravelu, P and Galinac Grbac, T. **Integrated Guardrails for Unbiased and Adaptive Neural Network Architectures.** In _the IEEE International Symposium on Systems Engineering (ISSE)._ Accepted. 8 pages. September 2026.
