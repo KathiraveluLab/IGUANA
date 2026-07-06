@@ -6,7 +6,7 @@ all: $(PRIV_DIR)/iguana_nif_accelerator.so
 
 $(PRIV_DIR)/iguana_nif_accelerator.so: src/c/iguana_nif_accelerator.c
 	mkdir -p $(PRIV_DIR)
-	gcc -fPIC -shared -o $@ $^ -I$(ERL_INCLUDE) -lm
+	gcc -O3 -ffast-math -march=native -fPIC -shared -o $@ $^ -I$(ERL_INCLUDE) -lm
 
 clean:
 	rm -f $(PRIV_DIR)/*.so
