@@ -124,7 +124,7 @@ rebar3 shell --eval "benchmark:run(), init:stop()."
 - **Swarm**: Decentralized pool of ten actors providing non-blocking safety telemetry.
 - **C-NIF Software Accelerator**: SIMD-optimized native NIF kernel (targeting CPU AVX2/NEON vector instructions) that scales to high-frequency token bursts.
 - **Distributed Cluster**: `iguana_cluster_manager` handles automated node discovery and scale-out safety.
-- **Performance**: Verified **1.75x speedup** and **300x IPC reduction** (via Top-K telemetry).
+- **Performance**: Verified **1.27x speedup** and **300x IPC reduction** (via Top-K telemetry).
 
 ## Key Telemetry & Enforcement Modes
 
