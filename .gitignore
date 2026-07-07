@@ -57,3 +57,9 @@ jquery.tablesorter.min.js
 suite.log.latest.html
 ct_log_cache
 otp_src_26.2.2/
+
+# Generated SSL/TLS Certificates and Keys
+priv/ssl/
+priv/ssl_dist_temp.conf
+
+

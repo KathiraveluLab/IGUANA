@@ -129,22 +129,68 @@ tc7_mathematical_purity(_Config) ->
 
 %% TC8: Asserts Distributed Swarm Handshake and Threshold Propagation
 tc8_distributed_handshake(_Config) ->
-    %% 1. Ensure the current node is named for distribution
+    %% 0. Dynamically generate ssl_dist_temp.conf with absolute paths
+    PrivDir = code:priv_dir(iguana),
+    CertFile = filename:join([PrivDir, "ssl", "cert.pem"]),
+    KeyFile = filename:join([PrivDir, "ssl", "key.pem"]),
+    CACertFile = filename:join([PrivDir, "ssl", "ca-cert.pem"]),
+    
+    ConfigContent = io_lib:format(
+        "[{server,\n"
+        "  [{certfile, \"~ts\"},\n"
+        "   {keyfile, \"~ts\"},\n"
+        "   {secure_renegotiate, true},\n"
+        "   {depth, 0},\n"
+        "   {verify, verify_peer},\n"
+        "   {fail_if_no_peer_cert, true},\n"
+        "   {cacertfile, \"~ts\"}]},\n"
+        " {client,\n"
+        "  [{certfile, \"~ts\"},\n"
+        "   {keyfile, \"~ts\"},\n"
+        "   {secure_renegotiate, true},\n"
+        "   {depth, 0},\n"
+        "   {verify, verify_none},\n"
+        "   {cacertfile, \"~ts\"}]}].\n",
+        [CertFile, KeyFile, CACertFile, CertFile, KeyFile, CACertFile]
+    ),
+    
+    SSLDistOptFile = filename:join([PrivDir, "ssl_dist_temp.conf"]),
+    ok = file:write_file(SSLDistOptFile, ConfigContent),
+
+    %% Ensure SSL/TLS distribution is configured for current process/application
+    application:set_env(ssl, ssl_dist_optfile, SSLDistOptFile),
+
+    %% 1. Ensure the current node is named for distribution with TLS
     case node() of
         nonode@nohost ->
             os:cmd("epmd -daemon"),
-            net_kernel:start([test_master, shortnames]);
-        _ -> ok
+            application:set_env(kernel, proto_dist, inet_tls),
+            {ok, _} = net_kernel:start([test_master, shortnames]);
+        _ -> 
+            application:set_env(kernel, proto_dist, inet_tls)
     end,
 
     %% Set a deterministic cookie for the test
     Cookie = iguana_test_cookie,
     erlang:set_cookie(node(), Cookie),
 
-    %% 2. Spawn a Peer Node using standard_io for maximum robustness
+    %% 2. Spawn a Peer Node using standard_io for maximum robustness and TLS enabled
+    %% Temporarily clear ERL_FLAGS so the peer node doesn't inherit conflicting arguments
+    OldErlFlags = os:getenv("ERL_FLAGS"),
+    os:putenv("ERL_FLAGS", ""),
+
     {ok, Peer, SlaveNode} = peer:start_link(#{name => test_slave,
                                             connection => standard_io,
-                                            args => ["-setcookie", atom_to_list(Cookie)]}),
+                                            args => [
+                                                "-proto_dist", "inet_tls",
+                                                "-ssl_dist_optfile", SSLDistOptFile,
+                                                "-setcookie", atom_to_list(Cookie)
+                                            ]}),
+
+    case OldErlFlags of
+        false -> ok;
+        _ -> os:putenv("ERL_FLAGS", OldErlFlags)
+    end,
 
     %% 3. Sync code path and start IGUANA on Peer
     %% Filter paths to ensure only existing absolute directories are sent
