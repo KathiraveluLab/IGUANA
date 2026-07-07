@@ -163,7 +163,66 @@ iguana_hf_controller:generate_sequence(P, "The").
 ```
 You should now see a constant stream of `[IGUANA_GUARD] Entropy spike detected!` messages in your terminal.
 
+
+---
+
+## 9. Deployment Modes & Zero-Leak Compliance
+
+IGUANA supports two distinct modes depending on your security and throughput requirements:
+
+### A. Preventative Block-Mode (Zero-Leak)
+In high-security contexts where zero-leak compliance is mandatory, you can configure IGUANA to execute synchronously. This prevents the inference engine from selecting the next token until the Erlang swarm has completed its evaluation.
+
+To enable this mode:
+1. Export the `IGUANA_BLOCK_MODE` environment variable before starting your Python worker:
+   ```bash
+   export IGUANA_BLOCK_MODE=true
+   ```
+2. Run your inference as normal. The `IguanaLogitsProcessor` will automatically pick up this flag and perform synchronous Erlang calls, zeroing out the probability space of prohibited/low-entropy paths and forcing an End-Of-Sequence (EOS) token immediately if a veto is issued.
+
+### B. Asynchronous Mode with Client-Side Sliding Buffer
+In throughput-critical streaming applications (e.g., chat interfaces), you can run IGUANA asynchronously (default mode). Because evaluations happen in parallel, a single unsafe token might be generated and streamed to the client before the Erlang swarm's veto signal halts the generation.
+
+To prevent this token from rendering on the screen, the client-side UI application can implement a **sliding window buffer of size N = 1 or 2 tokens**.
+
+Here is an example implementation in JavaScript/TypeScript for the frontend client:
+
+```typescript
+class IguanaStreamingClient {
+  private buffer: string[] = [];
+  private readonly N: number = 1; // 1-token rendering delay
+
+  // Called when a new token arrives from the backend stream
+  public onToken(token: string) {
+    this.buffer.push(token);
+    if (this.buffer.length > this.N) {
+      const tokenToDisplay = this.buffer.shift();
+      this.display(tokenToDisplay);
+    }
+  }
+
+  // Called if the backend broadcasts a safety veto event
+  public onVeto() {
+    console.warn("Safety veto received. Purging sliding buffer.");
+    this.buffer = []; // Purge the buffer to prevent leakage
+    this.closeStream();
+  }
+
+  // Called when the stream finishes normally
+  public onStreamEnd() {
+    while (this.buffer.length > 0) {
+      this.display(this.buffer.shift());
+    }
+  }
+
+  private display(text: string) {
+    document.getElementById("output").innerText += text;
+  }
+}
+```
+
 ---
 
 > [!TIP]
 > **GPU Requirements**: Running full inference requires a CUDA-capable GPU with at least 14GB of VRAM. If you don't have a GPU, you can still run the Erlang components and benchmarks to verify the swarm logic.
+
