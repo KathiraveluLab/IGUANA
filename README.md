@@ -22,6 +22,12 @@ IGUANA is a polyglot AI safety framework that decouples guardrail evaluation fro
 IGUANA/
 ├── src/
 │   ├── erlang/                  # Erlang/OTP sources
+│   │   ├── usecases/            # Domain-specific safety sentinels (New)
+│   │   │   ├── README.md        # Use cases documentation
+│   │   │   ├── iguana_clinical_usecase.erl
+│   │   │   ├── iguana_water_usecase.erl
+│   │   │   ├── iguana_financial_usecase.erl
+│   │   │   └── iguana_legal_usecase.erl
 │   │   ├── iguana_app.erl       # Application callback
 │   │   ├── iguana_sup.erl       # 10-actor swarm supervisor
 │   │   ├── iguana_meta_guard.erl # Context Broker (Dynamic Thresholds)
@@ -42,7 +48,8 @@ IGUANA/
 │       └── benchmark.erl        # Cross-platform latency benchmark
 ├── test/
 │   ├── iguana_entropy_guard_test.erl # EUnit suites
-│   └── iguana_SUITE.erl         # Common Test integration suite
+│   ├── iguana_SUITE.erl         # Common Test integration suite
+│   └── iguana_usecases_SUITE.erl # Use case integration suite (New)
 ├── include/
 │   └── iguana.hrl               # Shared record definitions
 ├── config/
@@ -155,6 +162,16 @@ iguana_hf_controller:stop(P).
 - **Erlang master** owns the process lifecycle and safety telemetry.
 - **Python worker** owns the GPU matrix multiplications.
 - **ErlPort** bridges them with sub-2ms IPC overhead.
+
+## Domain-Specific Use Cases
+
+IGUANA includes executable implementations for four high-stakes domains:
+1. **Clinical Healthcare & Mental Health**: Mitigates selective refusal bias using strict thresholds and soft logit corrections.
+2. **Water Reuse & Circular Economy**: Leverages soft-biases for salinity and contaminant constraints in agricultural decision-making instead of binary blocking.
+3. **Financial Services Risk Assessment**: Balances loan recommendation probabilities across underrepresented rural regions to counter demographic dataset bias.
+4. **Legal & Governmental Decision Support**: Prevents racial and socioeconomic bias skews in parole and sentencing draft summaries without rigid blocklists.
+
+For detailed design and modules, see the [Domain-Specific Use Cases README](src/erlang/usecases/README.md).
 
 ## Citation
 
