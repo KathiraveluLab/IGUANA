@@ -45,10 +45,12 @@ IGUANA/
 │   └── iguana_SUITE.erl         # Common Test integration suite
 ├── include/
 │   └── iguana.hrl               # Shared record definitions
+├── config/
+│   └── ssl_dist.conf            # SSL/TLS distribution configuration
+├── scripts/
+│   └── generate_certs.sh        # Self-signed certificate generation script
 ├── Makefile                     # Native NIF build system (Linux/macOS)
-├── rebar.config                 # rebar3 orchestration config
-└── priv/
-    └── iguana_nif_accelerator.* # SIMD-accelerated binaries
+└── rebar.config                 # rebar3 orchestration config
 ```
 
 ## Setup
