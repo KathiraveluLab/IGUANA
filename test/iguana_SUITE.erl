@@ -223,10 +223,19 @@ tc8_distributed_handshake(_Config) ->
                 {versions, ['tlsv1.2']},
                 {verify, verify_none}
             ],
-            ListenResult = peer:call(PeerPrimary, ssl, listen, [0, ServerOpts]),
+            ListenResult = case peer:call(PeerPrimary, gen_tcp, listen, [0, []]) of
+                {ok, TmpSocket} ->
+                    {ok, {_, LPort}} = peer:call(PeerPrimary, inet, sockname, [TmpSocket]),
+                    peer:call(PeerPrimary, gen_tcp, close, [TmpSocket]),
+                    case peer:call(PeerPrimary, ssl, listen, [LPort, ServerOpts]) of
+                        {ok, LSocket} -> {ok, LPort, LSocket};
+                        ListenErr -> {error, {ssl_listen_failed, ListenErr}}
+                    end;
+                TCPListenErr ->
+                    {error, {tcp_listen_failed, TCPListenErr}}
+            end,
             ManualTLSResult = case ListenResult of
-                {ok, LSocket} ->
-                    {ok, {_, LPort}} = peer:call(PeerPrimary, ssl, sockname, [LSocket]),
+                {ok, LPort, LSocket} ->
                     Self = self(),
                     spawn(fun() ->
                         AcceptRes = peer:call(PeerPrimary, ssl, transport_accept, [LSocket]),
