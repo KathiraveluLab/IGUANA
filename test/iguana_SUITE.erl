@@ -44,6 +44,16 @@ wait_for_swarm(Count, N) ->
             wait_for_swarm(Count, N-1)
     end.
 
+wait_for_swarm_peer(Peer, Count, 0) ->
+    ct:fail({swarm_bootstrap_failed, expected, Count, got, length(peer:call(Peer, pg, get_members, [iguana_swarm]))});
+wait_for_swarm_peer(Peer, Count, N) ->
+    case length(peer:call(Peer, pg, get_members, [iguana_swarm])) of
+        Count -> ok;
+        _ ->
+            timer:sleep(100),
+            wait_for_swarm_peer(Peer, Count, N-1)
+    end.
+
 end_per_suite(_Config) ->
     application:stop(iguana),
     ok.
@@ -157,73 +167,73 @@ tc8_distributed_handshake(_Config) ->
     SSLDistOptFile = filename:join([PrivDir, "ssl_dist_temp.conf"]),
     ok = file:write_file(SSLDistOptFile, ConfigContent),
 
-    %% Ensure SSL/TLS distribution is configured for current process/application
-    application:set_env(ssl, ssl_dist_optfile, SSLDistOptFile),
+    %% Start epmd if not running
+    os:cmd("epmd -daemon"),
 
-    %% 1. Ensure the current node is named for distribution with TLS
-    case node() of
-        nonode@nohost ->
-            os:cmd("epmd -daemon"),
-            application:set_env(kernel, proto_dist, inet_tls),
-            {ok, _} = net_kernel:start([test_master, shortnames]);
-        _ ->
-            application:set_env(kernel, proto_dist, inet_tls)
-    end,
-
-    %% Set a deterministic cookie for the test
     Cookie = iguana_test_cookie,
-    erlang:set_cookie(node(), Cookie),
 
-    %% 2. Spawn a Peer Node using standard_io for maximum robustness and TLS enabled
-    %% Temporarily clear ERL_FLAGS so the peer node doesn't inherit conflicting arguments
+    %% Temporarily clear ERL_FLAGS so the peer nodes don't inherit conflicting arguments
     OldErlFlags = os:getenv("ERL_FLAGS"),
     os:putenv("ERL_FLAGS", ""),
 
-    {ok, Peer, SlaveNode} = peer:start_link(#{name => test_slave,
-                                            connection => standard_io,
-                                            args => [
-                                                "-proto_dist", "inet_tls",
-                                                "-ssl_dist_optfile", SSLDistOptFile,
-                                                "-setcookie", atom_to_list(Cookie)
-                                            ]}),
+    %% Spawn PeerPrimary
+    {ok, PeerPrimary, PrimaryNode} = peer:start_link(#{name => test_primary_peer,
+                                                      connection => standard_io,
+                                                      args => [
+                                                          "-proto_dist", "inet_tls",
+                                                          "-ssl_dist_optfile", SSLDistOptFile,
+                                                          "-setcookie", atom_to_list(Cookie)
+                                                      ]}),
+
+    %% Spawn PeerSecondary
+    {ok, PeerSecondary, SecondaryNode} = peer:start_link(#{name => test_secondary_peer,
+                                                         connection => standard_io,
+                                                         args => [
+                                                             "-proto_dist", "inet_tls",
+                                                             "-ssl_dist_optfile", SSLDistOptFile,
+                                                             "-setcookie", atom_to_list(Cookie)
+                                                         ]}),
 
     case OldErlFlags of
         false -> ok;
         _ -> os:putenv("ERL_FLAGS", OldErlFlags)
     end,
 
-    %% 3. Sync code path and start IGUANA on Peer
-    %% Filter paths to ensure only existing absolute directories are sent
+    %% Sync code path on both peers
     Path = [P || P <- code:get_path(), filelib:is_dir(P)],
-    true = peer:call(Peer, code, set_path, [Path]),
+    true = peer:call(PeerPrimary, code, set_path, [Path]),
+    true = peer:call(PeerSecondary, code, set_path, [Path]),
 
-    %% Ensure the slave node can see the master node
-    pong = peer:call(Peer, net_adm, ping, [node()]),
+    %% Connect PeerSecondary to PeerPrimary
+    pong = peer:call(PeerSecondary, net_adm, ping, [PrimaryNode]),
     timer:sleep(100),
 
-    {ok, _} = peer:call(Peer, application, ensure_all_started, [iguana]),
+    %% Start IGUANA on both peers
+    {ok, _} = peer:call(PeerPrimary, application, ensure_all_started, [iguana]),
+    {ok, _} = peer:call(PeerSecondary, application, ensure_all_started, [iguana]),
 
-    %% 4. Verify Swarm Membership (10 Local + 10 Remote = 20 total)
-    wait_for_swarm(20, 100),
+    %% Verify Swarm Membership (10 on Primary + 10 on Secondary = 20 total)
+    wait_for_swarm_peer(PeerPrimary, 20, 100),
 
-    %% 5. Verify Threshold Propagation from Master -> Slave
-    iguana_meta_guard:update_context(medical),
+    %% Verify Threshold Propagation from Primary -> Secondary
+    peer:call(PeerPrimary, iguana_meta_guard, update_context, [medical]),
     timer:sleep(500),
 
-    %% Check a worker on the slave node
-    Members = pg:get_members(iguana_swarm),
-    SlaveWorkers = [P || P <- Members, node(P) == SlaveNode],
-    case SlaveWorkers of
-        [SlaveWorker | _] ->
-            {ok, State} = rpc:call(SlaveNode, iguana_entropy_guard, get_stats, [SlaveWorker]),
+    %% Check a worker on the secondary node
+    Members = peer:call(PeerPrimary, pg, get_members, [iguana_swarm]),
+    SecondaryWorkers = [P || P <- Members, node(P) == SecondaryNode],
+    case SecondaryWorkers of
+        [SecondaryWorker | _] ->
+            {ok, State} = peer:call(PeerSecondary, iguana_entropy_guard, get_stats, [SecondaryWorker]),
             %% Medical threshold should be 1.80
             1.8 = State#state.entropy_threshold;
         [] ->
-            ct:fail("No workers found on slave node")
+            ct:fail("No workers found on secondary node")
     end,
 
     %% Clean up
-    peer:stop(Peer),
+    peer:stop(PeerPrimary),
+    peer:stop(PeerSecondary),
     ok.
 
 tc9_adaptive_augmentation(_Config) ->

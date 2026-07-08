@@ -159,7 +159,7 @@ iguana_hf_controller:generate_sequence(P, <<"Tell me about climate change.">>).
 iguana_hf_controller:stop(P).
 ```
 
-- **Erlang master** owns the process lifecycle and safety telemetry.
+- **Erlang primary node** owns the process lifecycle and safety telemetry.
 - **Python worker** owns the GPU matrix multiplications.
 - **ErlPort** bridges them with sub-2ms IPC overhead.
 

@@ -1,6 +1,6 @@
 """
 iguana_hf_runner.py
-Executed natively by the Erlang Master Node via ErlPort.
+Executed natively by the Erlang Primary Node via ErlPort.
 
 This module boots the foundation model into GPU memory and attaches the
 IGUANA LogitsProcessor hook to autoregressive inference.  It also registers
@@ -47,7 +47,7 @@ def register_message_handler():
 
 def load_model(model_id_bytes):
     """
-    Invoked by the Erlang Master Controller to load the LLM into GPU memory.
+    Invoked by the Erlang Primary Controller to load the LLM into GPU memory.
     ErlPort serialises Erlang strings as Python bytes, hence the decode.
     """
     global MODEL, TOKENIZER
