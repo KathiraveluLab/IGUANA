@@ -27,7 +27,8 @@ openssl x509 -req \
     -CAkey "$SSL_DIR/ca-key.pem" \
     -CAcreateserial \
     -out "$SSL_DIR/cert.pem" \
-    -days 3650
+    -days 3650 \
+    -extfile <(printf "subjectAltName=DNS:localhost,IP:127.0.0.1\nbasicConstraints=CA:FALSE\nkeyUsage=digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth,clientAuth")
 
 # Clean up CSR
 rm -f "$SSL_DIR/req.pem"

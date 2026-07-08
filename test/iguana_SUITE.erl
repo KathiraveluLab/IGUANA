@@ -144,6 +144,20 @@ tc8_distributed_handshake(_Config) ->
     CertFile = filename:join([PrivDir, "ssl", "cert.pem"]),
     KeyFile = filename:join([PrivDir, "ssl", "key.pem"]),
 
+    %% 0a. Dynamically generate self-signed v3 certificates if they don't exist
+    SSLDir = filename:join([PrivDir, "ssl"]),
+    ok = filelib:ensure_dir(filename:join([SSLDir, "dummy"])),
+    CAKey = filename:join([SSLDir, "ca-key.pem"]),
+    CACert = filename:join([SSLDir, "ca-cert.pem"]),
+    Req = filename:join([SSLDir, "req.pem"]),
+    ExtFile = filename:join([SSLDir, "extfile.conf"]),
+    _ = os:cmd("openssl req -new -x509 -nodes -keyout " ++ CAKey ++ " -out " ++ CACert ++ " -days 3650 -subj \"/CN=IguanaCA\""),
+    _ = os:cmd("openssl req -new -nodes -keyout " ++ KeyFile ++ " -out " ++ Req ++ " -subj \"/CN=localhost\""),
+    ok = file:write_file(ExtFile, <<"subjectAltName=DNS:localhost,IP:127.0.0.1\nbasicConstraints=CA:FALSE\nkeyUsage=digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth,clientAuth\n">>),
+    _ = os:cmd("openssl x509 -req -in " ++ Req ++ " -CA " ++ CACert ++ " -CAkey " ++ CAKey ++ " -CAcreateserial -out " ++ CertFile ++ " -days 3650 -extfile " ++ ExtFile),
+    _ = file:delete(Req),
+    _ = file:delete(ExtFile),
+
     ConfigContent = io_lib:format(
         "[{server,\n"
         "  [{certfile, \"~ts\"},\n"
@@ -213,61 +227,8 @@ tc8_distributed_handshake(_Config) ->
             EpmdNames = os:cmd("epmd -names"),
             CertExists = filelib:is_file(CertFile),
             KeyExists = filelib:is_file(KeyFile),
-            peer:call(PeerPrimary, application, ensure_all_started, [ssl]),
-            peer:call(PeerSecondary, application, ensure_all_started, [ssl]),
-            ServerOpts = [
-                {certfile, CertFile},
-                {keyfile, KeyFile},
-                {secure_renegotiate, true},
-                {depth, 0},
-                {versions, ['tlsv1.2']},
-                {verify, verify_none}
-            ],
-            ListenResult = case peer:call(PeerPrimary, gen_tcp, listen, [0, []]) of
-                {ok, TmpSocket} ->
-                    {ok, {_, LPort0}} = peer:call(PeerPrimary, inet, sockname, [TmpSocket]),
-                    peer:call(PeerPrimary, gen_tcp, close, [TmpSocket]),
-                    case peer:call(PeerPrimary, ssl, listen, [LPort0, ServerOpts]) of
-                        {ok, LSocket0} -> {ok, LPort0, LSocket0};
-                        ListenErr0 -> {error, {ssl_listen_failed, ListenErr0}}
-                    end;
-                TCPListenErr ->
-                    {error, {tcp_listen_failed, TCPListenErr}}
-            end,
-            ManualTLSResult = case ListenResult of
-                {ok, LPort, LSocket} ->
-                    Self = self(),
-                    spawn(fun() ->
-                        AcceptRes = peer:call(PeerPrimary, ssl, transport_accept, [LSocket]),
-                        case AcceptRes of
-                            {ok, ASocket} ->
-                                HandshakeRes = peer:call(PeerPrimary, ssl, handshake, [ASocket]),
-                                Self ! {server_handshake, HandshakeRes};
-                            AcceptErr ->
-                                Self ! {server_accept, AcceptErr}
-                        end
-                    end),
-                    timer:sleep(200),
-                    ClientOpts = [
-                        {secure_renegotiate, true},
-                        {depth, 0},
-                        {verify, verify_none},
-                        {versions, ['tlsv1.2']},
-                        {server_name_indication, disable}
-                    ],
-                    CRes = peer:call(PeerSecondary, ssl, connect, ["127.0.0.1", LPort, ClientOpts, 2000]),
-                    SRes = receive
-                        {server_handshake, ShRes} -> {server_handshake, ShRes};
-                        {server_accept, SaRes} -> {server_accept, SaRes}
-                    after 1000 ->
-                        timeout
-                    end,
-                    {ok, LPort, CRes, SRes};
-                ListenErr ->
-                    {listen_err, ListenErr}
-            end,
-            ct:fail("Ping failed. Epmd: ~s, Cert: ~p, Key: ~p, ManualTLS: ~p",
-                    [EpmdNames, CertExists, KeyExists, ManualTLSResult])
+            ct:fail("Ping failed. Epmd: ~ts, Cert: ~p, Key: ~p",
+                    [EpmdNames, CertExists, KeyExists])
     end,
     timer:sleep(100),
 
