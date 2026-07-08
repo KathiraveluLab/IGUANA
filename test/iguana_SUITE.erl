@@ -134,7 +134,7 @@ tc8_distributed_handshake(_Config) ->
     CertFile = filename:join([PrivDir, "ssl", "cert.pem"]),
     KeyFile = filename:join([PrivDir, "ssl", "key.pem"]),
     CACertFile = filename:join([PrivDir, "ssl", "ca-cert.pem"]),
-    
+
     ConfigContent = io_lib:format(
         "[{server,\n"
         "  [{certfile, \"~ts\"},\n"
@@ -153,7 +153,7 @@ tc8_distributed_handshake(_Config) ->
         "   {cacertfile, \"~ts\"}]}].\n",
         [CertFile, KeyFile, CACertFile, CertFile, KeyFile, CACertFile]
     ),
-    
+
     SSLDistOptFile = filename:join([PrivDir, "ssl_dist_temp.conf"]),
     ok = file:write_file(SSLDistOptFile, ConfigContent),
 
@@ -166,7 +166,7 @@ tc8_distributed_handshake(_Config) ->
             os:cmd("epmd -daemon"),
             application:set_env(kernel, proto_dist, inet_tls),
             {ok, _} = net_kernel:start([test_master, shortnames]);
-        _ -> 
+        _ ->
             application:set_env(kernel, proto_dist, inet_tls)
     end,
 

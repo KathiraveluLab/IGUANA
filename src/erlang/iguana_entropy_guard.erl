@@ -4,8 +4,9 @@
 -type probabilities() :: [float()].
 
 %% API
--export([start_link/0, start_link/1, monitor_token/3, evaluate_entropy_sync/2, evaluate_entropy_sync/3,
-         set_threshold/1, set_augmentation/1, get_stats/1, set_vocab_size/1]).
+-export([start_link/0, start_link/1, monitor_token/3, evaluate_entropy_sync/2,
+         evaluate_entropy_sync/3, set_threshold/1, set_augmentation/1,
+         get_stats/1, set_vocab_size/1]).
 -export([calculate_entropy/2, skew_normal_cdf/2, owens_t/2]).
 
 %% gen_server callbacks

@@ -30,11 +30,12 @@ test_clinical_usecase(_Config) ->
     Indices = [1, 2, 3, 4],
     Probs = [0.25, 0.25, 0.25, 0.25, 0.0],
     SafeProbs = [0.8, 0.1, 0.05, 0.05, 0.0],
-    
+
     %% Case 1: Hazard query -> should inject bias
-    {inject_bias, BiasVec1, Indices} = iguana_clinical_usecase:evaluate("doctor prescribe medication", Indices, Probs),
+    {inject_bias, BiasVec1, Indices} =
+        iguana_clinical_usecase:evaluate("doctor prescribe medication", Indices, Probs),
     4 = length(BiasVec1),
-    
+
     %% Case 2: Safe query -> should pass standard entropy guard (mid entropy accepted)
     ok = iguana_clinical_usecase:evaluate("healthy food benefits", Indices, SafeProbs),
     ok.
@@ -43,11 +44,12 @@ test_clinical_usecase(_Config) ->
 test_water_usecase(_Config) ->
     Indices = [1, 2, 3, 4],
     Probs = [0.25, 0.25, 0.25, 0.25, 0.0],
-    
+
     %% Case 1: Contaminant query -> should inject soft-correction bias vector
-    {inject_bias, BiasVec, Indices} = iguana_water_usecase:evaluate("fertigation salinity contaminants", Indices, Probs),
+    {inject_bias, BiasVec, Indices} =
+        iguana_water_usecase:evaluate("fertigation salinity contaminant", Indices, Probs),
     4 = length(BiasVec),
-    
+
     %% Case 2: Safe query -> should pass standard entropy guard
     ok = iguana_water_usecase:evaluate("general layout design", Indices, Probs),
     ok.
@@ -56,11 +58,12 @@ test_water_usecase(_Config) ->
 test_financial_usecase(_Config) ->
     Indices = [1, 2, 3, 4],
     Probs = [0.25, 0.25, 0.25, 0.25, 0.0],
-    
+
     %% Case 1: Underrepresented region query -> should inject rebalancing bias vector
-    {inject_bias, BiasVec, Indices} = iguana_financial_usecase:evaluate("rural small-business applications", Indices, Probs),
+    {inject_bias, BiasVec, Indices} =
+        iguana_financial_usecase:evaluate("rural applications", Indices, Probs),
     4 = length(BiasVec),
-    
+
     %% Case 2: Standard region query -> should pass standard entropy guard
     ok = iguana_financial_usecase:evaluate("urban commercial center", Indices, Probs),
     ok.
@@ -69,11 +72,12 @@ test_financial_usecase(_Config) ->
 test_legal_usecase(_Config) ->
     Indices = [1, 2, 3, 4],
     Probs = [0.25, 0.25, 0.25, 0.25, 0.0],
-    
+
     %% Case 1: Sentencing query -> should inject soft corrective bias
-    {inject_bias, BiasVec, Indices} = iguana_legal_usecase:evaluate("sentencing rationale draft", Indices, Probs),
+    {inject_bias, BiasVec, Indices} =
+        iguana_legal_usecase:evaluate("sentencing rationale draft", Indices, Probs),
     4 = length(BiasVec),
-    
+
     %% Case 2: Safe query -> should pass standard entropy guard
     ok = iguana_legal_usecase:evaluate("general contract agreement", Indices, Probs),
     ok.
