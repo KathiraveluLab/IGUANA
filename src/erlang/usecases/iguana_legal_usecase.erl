@@ -12,11 +12,19 @@ evaluate(DraftText, Indices, Probabilities) ->
         true ->
             %% Adjust probability distribution to rebalance options mathematically
             K = length(Indices),
-            {inject_bias, [0.4 || _ <- lists:seq(1, K)], Indices};
+            Xi = K / 2.0,
+            Omega = K / 4.0,
+            Alpha = 2.0,
+            A2 = 0.4,
+            BiasVector = [
+                A2 * iguana_entropy_guard:skew_normal_cdf((I - Xi) / Omega, Alpha)
+                || I <- lists:seq(1, K)
+            ],
+            {inject_bias, BiasVector, Indices};
         false ->
             iguana_entropy_guard:evaluate_entropy_sync(Indices, Probabilities)
     end.
 
 detects_sentencing_bias(Text) ->
-    string:find(Text, "sentencing rationale") =/= nomatch or
-    string:find(Text, "parole recommendation") =/= nomatch.
+    (string:find(Text, "sentencing rationale") =/= nomatch) orelse
+    (string:find(Text, "parole recommendation") =/= nomatch).

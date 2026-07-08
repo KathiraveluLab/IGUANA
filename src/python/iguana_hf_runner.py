@@ -77,7 +77,7 @@ def generate(prompt_bytes):
     print(f"[PYTHON WORKER] Initiating sequence generation: '{prompt}' (BlockMode: {block_mode})")
 
     eos_token_id    = TOKENIZER.eos_token_id
-    iguana_hook     = IguanaLogitsProcessor(eos_token_id, block_mode=block_mode)
+    iguana_hook     = IguanaLogitsProcessor(eos_token_id, block_mode=block_mode, tokenizer=TOKENIZER)
     processors      = LogitsProcessorList([iguana_hook])
 
     inputs = TOKENIZER(prompt, return_tensors="pt").to(MODEL.device)

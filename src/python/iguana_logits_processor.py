@@ -16,15 +16,17 @@ class IguanaLogitsProcessor(LogitsProcessor):
     and enforces hard terminations via EOS token forcing.
     """
     
-    def __init__(self, eos_token_id: int, block_mode: bool = False):
+    def __init__(self, eos_token_id: int, block_mode: bool = False, tokenizer = None):
         """
         Initializes the processor.
         :param eos_token_id: The specific End-Of-Sequence token ID for the active 
                              Hugging Face model tokenizer (e.g., 2 for LLaMA).
         :param block_mode: If True, blocks synchronously on Erlang safety evaluations.
+        :param tokenizer: Optional Hugging Face tokenizer instance.
         """
         self.eos_token_id = eos_token_id
         self.block_mode = block_mode
+        self.tokenizer = tokenizer
         self.vocab_initialized = False
         print(f"[IGUANA HOOK] Initialized LogitsProcessor. Guardrail EOS tied to ID: {self.eos_token_id}, BlockMode: {self.block_mode}")
 
@@ -53,10 +55,22 @@ class IguanaLogitsProcessor(LogitsProcessor):
             rest_mass = 1.0 - sum(telemetry_probs)
             telemetry_probs.append(max(0.0, rest_mass))
             
+            # Resolve token IDs to string representations if tokenizer is available
+            tokens = []
+            if self.tokenizer is not None:
+                try:
+                    tokens = self.tokenizer.convert_ids_to_tokens(telemetry_indices)
+                    tokens = [t.decode('utf-8') if isinstance(t, bytes) else str(t) for t in tokens]
+                except Exception as tok_err:
+                    print(f"[IGUANA HOOK] Token resolution failed: {tok_err}")
+                    tokens = [str(i) for i in telemetry_indices]
+            else:
+                tokens = [str(i) for i in telemetry_indices]
+            
             if self.block_mode:
                 # Synchronous preventative block mode
                 from erlport.erlterms import Atom
-                action = iguana_bridge.send_activation_state(telemetry_indices, telemetry_probs, block=True)
+                action = iguana_bridge.send_activation_state(telemetry_indices, telemetry_probs, tokens=tokens, block=True)
                 if action == Atom(b"veto_token") or (isinstance(action, tuple) and action[0] == Atom(b"veto_token")):
                     print("[PYTHON INFERENCE] Erlang Guardrail issued a hard veto (sync). Halting generation.")
                     scores[:, :] = -float('inf')
@@ -69,7 +83,7 @@ class IguanaLogitsProcessor(LogitsProcessor):
                     print(f"[PYTHON BRIDGE] Applied dynamic bias injection (sync) for {len(target_indices)} tokens.")
             else:
                 # Asynchronous out-of-band mode
-                iguana_bridge.send_activation_state(telemetry_indices, telemetry_probs, block=False)
+                iguana_bridge.send_activation_state(telemetry_indices, telemetry_probs, tokens=tokens, block=False)
                 
                 # 3. Targeted Bias Adjustment (SkewPNN implementation)
                 if iguana_bridge.ACTIVE_BIAS_VECTOR is not None and iguana_bridge.ACTIVE_BIAS_INDICES is not None:

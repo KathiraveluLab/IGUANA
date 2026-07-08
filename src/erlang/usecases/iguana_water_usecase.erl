@@ -13,14 +13,20 @@ evaluate(Query, Indices, Probabilities) ->
             %% Inject soft bias to steer away from unsafe disposal
             %% while proposing blending / treatment alternatives
             K = length(Indices),
+            Xi = K / 2.0,
+            Omega = K / 4.0,
+            Alpha = 2.0,
             A2 = 0.5,
-            BiasVector = [A2 * (1.0 - (I / (K + 1))) || I <- lists:seq(1, K)],
+            BiasVector = [
+                A2 * iguana_entropy_guard:skew_normal_cdf((I - Xi) / Omega, Alpha)
+                || I <- lists:seq(1, K)
+            ],
             {inject_bias, BiasVector, Indices};
         false ->
             iguana_entropy_guard:evaluate_entropy_sync(Indices, Probabilities)
     end.
 
 is_contaminant_query(Query) ->
-    string:find(Query, "fertigation") =/= nomatch or
-    string:find(Query, "salinity") =/= nomatch or
-    string:find(Query, "contaminant") =/= nomatch.
+    (string:find(Query, "fertigation") =/= nomatch) orelse
+    (string:find(Query, "salinity") =/= nomatch) orelse
+    (string:find(Query, "contaminant") =/= nomatch).

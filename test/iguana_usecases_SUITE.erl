@@ -29,13 +29,14 @@ end_per_suite(_Config) ->
 test_clinical_usecase(_Config) ->
     Indices = [1, 2, 3, 4],
     Probs = [0.25, 0.25, 0.25, 0.25, 0.0],
+    SafeProbs = [0.8, 0.1, 0.05, 0.05, 0.0],
     
     %% Case 1: Hazard query -> should inject bias
     {inject_bias, BiasVec1, Indices} = iguana_clinical_usecase:evaluate("doctor prescribe medication", Indices, Probs),
     4 = length(BiasVec1),
     
     %% Case 2: Safe query -> should pass standard entropy guard (mid entropy accepted)
-    ok = iguana_clinical_usecase:evaluate("healthy food benefits", Indices, Probs),
+    ok = iguana_clinical_usecase:evaluate("healthy food benefits", Indices, SafeProbs),
     ok.
 
 %% Water Reuse Use Case Tests

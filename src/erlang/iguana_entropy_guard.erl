@@ -4,7 +4,7 @@
 -type probabilities() :: [float()].
 
 %% API
--export([start_link/0, start_link/1, monitor_token/3, evaluate_entropy_sync/2,
+-export([start_link/0, start_link/1, monitor_token/3, evaluate_entropy_sync/2, evaluate_entropy_sync/3,
          set_threshold/1, set_augmentation/1, get_stats/1, set_vocab_size/1]).
 -export([calculate_entropy/2, skew_normal_cdf/2, owens_t/2]).
 
@@ -54,13 +54,18 @@ monitor_token(EnginePid, Indices, Probabilities) ->
 -spec evaluate_entropy_sync([integer()], probabilities()) ->
     ok | {inject_bias, [float()], [integer()]} | {veto_token, term()} | {error, term()}.
 evaluate_entropy_sync(Indices, Probabilities) ->
+    evaluate_entropy_sync(Indices, Probabilities, []).
+
+-spec evaluate_entropy_sync([integer()], probabilities(), [binary() | string()]) ->
+    ok | {inject_bias, [float()], [integer()]} | {veto_token, term()} | {error, term()}.
+evaluate_entropy_sync(Indices, Probabilities, Tokens) ->
     case pg:get_members(iguana_swarm) of
         [] -> {error, no_workers};
         Members ->
             MaxMailbox = 100,
             case find_best_worker(Members, {none, MaxMailbox}) of
                 {ok, Worker} ->
-                    gen_server:call(Worker, {evaluate_entropy, Indices, Probabilities});
+                    gen_server:call(Worker, {evaluate_entropy, Indices, Probabilities, Tokens});
                 {error, overloaded} ->
                     {error, overloaded}
             end
@@ -138,7 +143,9 @@ handle_call({set_augmentation, Factor}, _From, State) ->
     {reply, ok, State#state{augmentation_factor = Factor}};
 handle_call(get_stats, _From, State) ->
     {reply, {ok, State}, State};
-handle_call({evaluate_entropy, Indices, Probabilities}, _From, State) ->
+handle_call({evaluate_entropy, Indices, Probabilities}, From, State) ->
+    handle_call({evaluate_entropy, Indices, Probabilities, []}, From, State);
+handle_call({evaluate_entropy, Indices, Probabilities, _Tokens}, _From, State) ->
     Entropy = calculate_entropy(Probabilities, State#state.vocab_size),
     VetoThreshold = 0.5,
     if
@@ -163,6 +170,8 @@ handle_call(_Request, _From, State) ->
     {reply, ok, State}.
 
 handle_cast({evaluate_entropy, EnginePid, Indices, Probabilities}, State) ->
+    handle_cast({evaluate_entropy, EnginePid, Indices, Probabilities, []}, State);
+handle_cast({evaluate_entropy, EnginePid, Indices, Probabilities, _Tokens}, State) ->
     Entropy = calculate_entropy(Probabilities, State#state.vocab_size),
     VetoThreshold = 0.5,
     if

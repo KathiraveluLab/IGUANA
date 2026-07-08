@@ -17,7 +17,7 @@ start_link() ->
 %% @doc Updates the architectural context trust score by mapping a domain to its threshold.
 %% Domains: medical (strict), creative (relaxed), general (balanced)
 update_context(Domain) ->
-    gen_server:cast(?MODULE, {update_domain, Domain}).
+    gen_server:call(?MODULE, {update_domain, Domain}).
 
 %% @doc Updates the global augmentation factor (A2) across the swarm.
 -spec update_augmentation(float()) -> ok.
@@ -43,7 +43,25 @@ init([]) ->
 handle_call(get_threshold, _From, State) ->
     {reply, State#state.current_threshold, State};
 handle_call(get_domain, _From, State) ->
-    {reply, State#state.current_domain, State}.
+    {reply, State#state.current_domain, State};
+handle_call({update_domain, Domain}, _From, State) ->
+    case map_domain_to_threshold(Domain) of
+        unknown ->
+            io:format("[IGUANA_META] Unknown domain ~p ignored.~n", [Domain]),
+            {reply, unknown, State};
+        NewThreshold ->
+            io:format("[IGUANA_META] Context shift detected: ~p -> ~p (Threshold: ~.2f)~n",
+                      [State#state.current_domain, Domain, NewThreshold]),
+
+            %% Section 2.1: Synchronize the Swarm
+            iguana_entropy_guard:set_threshold(NewThreshold),
+
+            {reply, ok, State#state{
+                current_domain = Domain,
+                current_threshold = NewThreshold
+            }}
+    end.
+
 
 handle_cast({update_domain, Domain}, State) ->
     case map_domain_to_threshold(Domain) of
