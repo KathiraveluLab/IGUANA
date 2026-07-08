@@ -151,10 +151,27 @@ tc8_distributed_handshake(_Config) ->
     CACert = filename:join([SSLDir, "ca-cert.pem"]),
     Req = filename:join([SSLDir, "req.pem"]),
     ExtFile = filename:join([SSLDir, "extfile.conf"]),
-    _ = os:cmd("openssl req -new -x509 -nodes -keyout " ++ CAKey ++ " -out " ++ CACert ++ " -days 3650 -subj \"/CN=IguanaCA\""),
-    _ = os:cmd("openssl req -new -nodes -keyout " ++ KeyFile ++ " -out " ++ Req ++ " -subj \"/CN=localhost\""),
-    ok = file:write_file(ExtFile, <<"subjectAltName=DNS:localhost,IP:127.0.0.1\nbasicConstraints=CA:FALSE\nkeyUsage=digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth,clientAuth\n">>),
-    _ = os:cmd("openssl x509 -req -in " ++ Req ++ " -CA " ++ CACert ++ " -CAkey " ++ CAKey ++ " -CAcreateserial -out " ++ CertFile ++ " -days 3650 -extfile " ++ ExtFile),
+    _ = os:cmd(
+        "openssl req -new -x509 -nodes -keyout " ++ CAKey ++
+        " -out " ++ CACert ++ " -days 3650 -subj \"/CN=IguanaCA\""
+    ),
+    _ = os:cmd(
+        "openssl req -new -nodes -keyout " ++ KeyFile ++
+        " -out " ++ Req ++ " -subj \"/CN=localhost\""
+    ),
+    ok = file:write_file(
+        ExtFile,
+        <<"subjectAltName=DNS:localhost,IP:127.0.0.1\n",
+          "basicConstraints=CA:FALSE\n",
+          "keyUsage=digitalSignature,keyEncipherment\n",
+          "extendedKeyUsage=serverAuth,clientAuth\n">>
+    ),
+    _ = os:cmd(
+        "openssl x509 -req -in " ++ Req ++
+        " -CA " ++ CACert ++ " -CAkey " ++ CAKey ++
+        " -CAcreateserial -out " ++ CertFile ++
+        " -days 3650 -extfile " ++ ExtFile
+    ),
     _ = file:delete(Req),
     _ = file:delete(ExtFile),
 
