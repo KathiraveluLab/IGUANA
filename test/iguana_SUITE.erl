@@ -159,6 +159,7 @@ tc8_distributed_handshake(_Config) ->
         "   {secure_renegotiate, true},\n"
         "   {depth, 0},\n"
         "   {verify, verify_none},\n"
+        "   {server_name_indication, disable},\n"
         "   {cacertfile, \"~ts\"}]}].\n",
         [CertFile, KeyFile, CACertFile, CertFile, KeyFile, CACertFile]
     ),
