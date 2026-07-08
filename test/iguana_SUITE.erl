@@ -204,7 +204,37 @@ tc8_distributed_handshake(_Config) ->
     true = peer:call(PeerSecondary, code, set_path, [Path]),
 
     %% Connect PeerSecondary to PeerPrimary
-    pong = peer:call(PeerSecondary, net_adm, ping, [PrimaryNode]),
+    case peer:call(PeerSecondary, net_adm, ping, [PrimaryNode]) of
+        pong ->
+            ok;
+        pang ->
+            io:format("=== DIAGNOSTIC START ===~n"),
+            EpmdNames = os:cmd("epmd -names"),
+            io:format("Epmd names: ~s~n", [EpmdNames]),
+            case erl_epmd:port_please("test_primary_peer", "127.0.0.1") of
+                {port, Port, _Version} ->
+                    io:format("test_primary_peer port: ~p~n", [Port]),
+                    TCPOpts = [binary, {active, false}],
+                    TCPResult = peer:call(PeerSecondary, gen_tcp, connect,
+                                          ["127.0.0.1", Port, TCPOpts, 2000]),
+                    io:format("Direct TCP result from PeerSecondary: ~p~n",
+                              [TCPResult]),
+                    SSLOptions = [
+                        {secure_renegotiate, true},
+                        {depth, 0},
+                        {verify, verify_none},
+                        {server_name_indication, disable}
+                    ],
+                    SSLResult = peer:call(PeerSecondary, ssl, connect,
+                                         ["127.0.0.1", Port, SSLOptions, 5000]),
+                    io:format("Direct SSL result from PeerSecondary: ~p~n",
+                              [SSLResult]);
+                Error ->
+                    io:format("Failed to get port from epmd: ~p~n", [Error])
+            end,
+            io:format("=== DIAGNOSTIC END ===~n"),
+            exit({ping_failed, pang})
+    end,
     timer:sleep(100),
 
     %% Start IGUANA on both peers
