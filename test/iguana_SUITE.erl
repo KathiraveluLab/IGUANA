@@ -225,11 +225,11 @@ tc8_distributed_handshake(_Config) ->
             ],
             ListenResult = case peer:call(PeerPrimary, gen_tcp, listen, [0, []]) of
                 {ok, TmpSocket} ->
-                    {ok, {_, LPort}} = peer:call(PeerPrimary, inet, sockname, [TmpSocket]),
+                    {ok, {_, LPort0}} = peer:call(PeerPrimary, inet, sockname, [TmpSocket]),
                     peer:call(PeerPrimary, gen_tcp, close, [TmpSocket]),
-                    case peer:call(PeerPrimary, ssl, listen, [LPort, ServerOpts]) of
-                        {ok, LSocket} -> {ok, LPort, LSocket};
-                        ListenErr -> {error, {ssl_listen_failed, ListenErr}}
+                    case peer:call(PeerPrimary, ssl, listen, [LPort0, ServerOpts]) of
+                        {ok, LSocket0} -> {ok, LPort0, LSocket0};
+                        ListenErr0 -> {error, {ssl_listen_failed, ListenErr0}}
                     end;
                 TCPListenErr ->
                     {error, {tcp_listen_failed, TCPListenErr}}
