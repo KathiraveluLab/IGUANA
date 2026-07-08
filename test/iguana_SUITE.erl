@@ -226,7 +226,7 @@ tc8_distributed_handshake(_Config) ->
             ListenResult = peer:call(PeerPrimary, ssl, listen, [0, ServerOpts]),
             ManualTLSResult = case ListenResult of
                 {ok, LSocket} ->
-                    {ok, LPort} = peer:call(PeerPrimary, ssl, port, [LSocket]),
+                    {ok, {_, LPort}} = peer:call(PeerPrimary, ssl, sockname, [LSocket]),
                     Self = self(),
                     spawn(fun() ->
                         AcceptRes = peer:call(PeerPrimary, ssl, transport_accept, [LSocket]),
