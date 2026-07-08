@@ -143,7 +143,6 @@ tc8_distributed_handshake(_Config) ->
     PrivDir = code:priv_dir(iguana),
     CertFile = filename:join([PrivDir, "ssl", "cert.pem"]),
     KeyFile = filename:join([PrivDir, "ssl", "key.pem"]),
-    CACertFile = filename:join([PrivDir, "ssl", "ca-cert.pem"]),
 
     ConfigContent = io_lib:format(
         "[{server,\n"
@@ -151,17 +150,13 @@ tc8_distributed_handshake(_Config) ->
         "   {keyfile, \"~ts\"},\n"
         "   {secure_renegotiate, true},\n"
         "   {depth, 0},\n"
-        "   {verify, verify_none},\n"
-        "   {cacertfile, \"~ts\"}]},\n"
+        "   {verify, verify_none}]},\n"
         " {client,\n"
-        "  [{certfile, \"~ts\"},\n"
-        "   {keyfile, \"~ts\"},\n"
-        "   {secure_renegotiate, true},\n"
+        "  [{secure_renegotiate, true},\n"
         "   {depth, 0},\n"
         "   {verify, verify_none},\n"
-        "   {server_name_indication, disable},\n"
-        "   {cacertfile, \"~ts\"}]}].\n",
-        [CertFile, KeyFile, CACertFile, CertFile, KeyFile, CACertFile]
+        "   {server_name_indication, disable}]}].\n",
+        [CertFile, KeyFile]
     ),
 
     SSLDistOptFile = filename:join([PrivDir, "ssl_dist_temp.conf"]),
