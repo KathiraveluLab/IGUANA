@@ -150,11 +150,13 @@ tc8_distributed_handshake(_Config) ->
         "   {keyfile, \"~ts\"},\n"
         "   {secure_renegotiate, true},\n"
         "   {depth, 0},\n"
+        "   {versions, ['tlsv1.2']},\n"
         "   {verify, verify_none}]},\n"
         " {client,\n"
         "  [{secure_renegotiate, true},\n"
         "   {depth, 0},\n"
         "   {verify, verify_none},\n"
+        "   {versions, ['tlsv1.2']},\n"
         "   {server_name_indication, disable}]}].\n",
         [CertFile, KeyFile]
     ),
@@ -204,33 +206,7 @@ tc8_distributed_handshake(_Config) ->
     true = peer:call(PeerSecondary, code, set_path, [Path]),
 
     %% Connect PeerSecondary to PeerPrimary
-    case peer:call(PeerSecondary, net_adm, ping, [PrimaryNode]) of
-        pong ->
-            ok;
-        pang ->
-            EpmdNames = os:cmd("epmd -names"),
-            {PortMsg, TCPResult, SSLResult} =
-                case erl_epmd:port_please("test_primary_peer", "127.0.0.1") of
-                    {port, Port, _Version} ->
-                        TCPOpts = [binary, {active, false}],
-                        TRes = peer:call(PeerSecondary, gen_tcp, connect,
-                                         ["127.0.0.1", Port, TCPOpts, 2000]),
-                        SSLOptions = [
-                            {secure_renegotiate, true},
-                            {depth, 0},
-                            {verify, verify_none},
-                            {server_name_indication, disable}
-                        ],
-                        peer:call(PeerSecondary, application, ensure_all_started, [ssl]),
-                        SRes = peer:call(PeerSecondary, ssl, connect,
-                                         ["127.0.0.1", Port, SSLOptions, 5000]),
-                        {io_lib:format("port:~p", [Port]), TRes, SRes};
-                    Error ->
-                        {io_lib:format("epmd_err:~p", [Error]), noport, noport}
-                end,
-            ct:fail("Ping failed. Epmd: ~s, Port: ~s, TCP: ~p, SSL: ~p",
-                    [EpmdNames, PortMsg, TCPResult, SSLResult])
-    end,
+    pong = peer:call(PeerSecondary, net_adm, ping, [PrimaryNode]),
     timer:sleep(100),
 
     %% Start IGUANA on both peers
