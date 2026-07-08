@@ -151,7 +151,8 @@ tc8_distributed_handshake(_Config) ->
         "   {keyfile, \"~ts\"},\n"
         "   {secure_renegotiate, true},\n"
         "   {depth, 0},\n"
-        "   {verify, verify_none},\n"
+        "   {verify, verify_peer},\n"
+        "   {fail_if_no_peer_cert, true},\n"
         "   {cacertfile, \"~ts\"}]},\n"
         " {client,\n"
         "  [{certfile, \"~ts\"},\n"
@@ -177,6 +178,7 @@ tc8_distributed_handshake(_Config) ->
 
     %% Spawn PeerPrimary
     {ok, PeerPrimary, PrimaryNode} = peer:start_link(#{name => test_primary_peer,
+                                                      host => "localhost",
                                                       connection => standard_io,
                                                       args => [
                                                           "-proto_dist", "inet_tls",
@@ -186,6 +188,7 @@ tc8_distributed_handshake(_Config) ->
 
     %% Spawn PeerSecondary
     {ok, PeerSecondary, SecondaryNode} = peer:start_link(#{name => test_secondary_peer,
+                                                         host => "localhost",
                                                          connection => standard_io,
                                                          args => [
                                                              "-proto_dist", "inet_tls",
