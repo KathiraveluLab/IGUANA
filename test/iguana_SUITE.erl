@@ -178,7 +178,8 @@ tc8_distributed_handshake(_Config) ->
 
     %% Spawn PeerPrimary
     {ok, PeerPrimary, PrimaryNode} = peer:start_link(#{name => test_primary_peer,
-                                                      host => "localhost",
+                                                      host => "127.0.0.1",
+                                                      longnames => true,
                                                       connection => standard_io,
                                                       args => [
                                                           "-proto_dist", "inet_tls",
@@ -188,7 +189,8 @@ tc8_distributed_handshake(_Config) ->
 
     %% Spawn PeerSecondary
     {ok, PeerSecondary, SecondaryNode} = peer:start_link(#{name => test_secondary_peer,
-                                                         host => "localhost",
+                                                         host => "127.0.0.1",
+                                                         longnames => true,
                                                          connection => standard_io,
                                                          args => [
                                                              "-proto_dist", "inet_tls",
