@@ -221,6 +221,7 @@ tc8_distributed_handshake(_Config) ->
                             {verify, verify_none},
                             {server_name_indication, disable}
                         ],
+                        peer:call(PeerSecondary, application, ensure_all_started, [ssl]),
                         SRes = peer:call(PeerSecondary, ssl, connect,
                                          ["127.0.0.1", Port, SSLOptions, 5000]),
                         {io_lib:format("port:~p", [Port]), TRes, SRes};
