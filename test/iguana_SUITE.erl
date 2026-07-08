@@ -211,28 +211,54 @@ tc8_distributed_handshake(_Config) ->
             ok;
         pang ->
             EpmdNames = os:cmd("epmd -names"),
-            {PortMsg, TCPResult, SSLResult} =
-                case erl_epmd:port_please("test_primary_peer", "127.0.0.1") of
-                    {port, Port, _Version} ->
-                        TCPOpts = [binary, {active, false}],
-                        TRes = peer:call(PeerSecondary, gen_tcp, connect,
-                                         ["127.0.0.1", Port, TCPOpts, 2000]),
-                        SSLOptions = [
-                            {secure_renegotiate, true},
-                            {depth, 0},
-                            {verify, verify_none},
-                            {versions, ['tlsv1.2']},
-                            {server_name_indication, disable}
-                        ],
-                        peer:call(PeerSecondary, application, ensure_all_started, [ssl]),
-                        SRes = peer:call(PeerSecondary, ssl, connect,
-                                         ["127.0.0.1", Port, SSLOptions, 5000]),
-                        {io_lib:format("port:~p", [Port]), TRes, SRes};
-                    Error ->
-                        {io_lib:format("epmd_err:~p", [Error]), noport, noport}
-                end,
-            ct:fail("Ping failed. Epmd: ~s, Port: ~s, TCP: ~p, SSL: ~p",
-                    [EpmdNames, PortMsg, TCPResult, SSLResult])
+            CertExists = filelib:is_file(CertFile),
+            KeyExists = filelib:is_file(KeyFile),
+            peer:call(PeerPrimary, application, ensure_all_started, [ssl]),
+            peer:call(PeerSecondary, application, ensure_all_started, [ssl]),
+            ServerOpts = [
+                {certfile, CertFile},
+                {keyfile, KeyFile},
+                {secure_renegotiate, true},
+                {depth, 0},
+                {versions, ['tlsv1.2']},
+                {verify, verify_none}
+            ],
+            ListenResult = peer:call(PeerPrimary, ssl, listen, [0, ServerOpts]),
+            ManualTLSResult = case ListenResult of
+                {ok, LSocket} ->
+                    {ok, LPort} = peer:call(PeerPrimary, ssl, port, [LSocket]),
+                    Self = self(),
+                    spawn(fun() ->
+                        AcceptRes = peer:call(PeerPrimary, ssl, transport_accept, [LSocket]),
+                        case AcceptRes of
+                            {ok, ASocket} ->
+                                HandshakeRes = peer:call(PeerPrimary, ssl, handshake, [ASocket]),
+                                Self ! {server_handshake, HandshakeRes};
+                            AcceptErr ->
+                                Self ! {server_accept, AcceptErr}
+                        end
+                    end),
+                    timer:sleep(200),
+                    ClientOpts = [
+                        {secure_renegotiate, true},
+                        {depth, 0},
+                        {verify, verify_none},
+                        {versions, ['tlsv1.2']},
+                        {server_name_indication, disable}
+                    ],
+                    CRes = peer:call(PeerSecondary, ssl, connect, ["127.0.0.1", LPort, ClientOpts, 2000]),
+                    SRes = receive
+                        {server_handshake, ShRes} -> {server_handshake, ShRes};
+                        {server_accept, SaRes} -> {server_accept, SaRes}
+                    after 1000 ->
+                        timeout
+                    end,
+                    {ok, LPort, CRes, SRes};
+                ListenErr ->
+                    {listen_err, ListenErr}
+            end,
+            ct:fail("Ping failed. Epmd: ~s, Cert: ~p, Key: ~p, ManualTLS: ~p",
+                    [EpmdNames, CertExists, KeyExists, ManualTLSResult])
     end,
     timer:sleep(100),
 
