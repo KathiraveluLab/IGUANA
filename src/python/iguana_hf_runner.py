@@ -9,7 +9,7 @@ any Erlang-to-Python cast (inject_bias, veto_token) is processed immediately.
 
 Runtime Requirements:
     - Python >= 3.10
-    - Erlang/OTP >= 26  (invoked via ErlPort from iguana_hf_controller.erl)
+    - Erlang/OTP >= 27  (invoked via ErlPort from iguana_hf_controller.erl)
     - erlport            (pip install erlport)
     - PyTorch >= 2.0 with CUDA support
     - Hugging Face `transformers` >= 4.38

@@ -8,7 +8,7 @@ IGUANA is an AI safety framework that decouples guardrail evaluation from the se
 
 | Component | Version |
 |-----------|---------|
-| Erlang/OTP | ≥ 26 |
+| Erlang/OTP | ≥ 27 |
 | rebar3 | ≥ 3.22 |
 | Python | ≥ 3.10 |
 | PyTorch | ≥ 2.0 (CUDA-capable GPU required for live inference) |
@@ -79,7 +79,7 @@ rebar3 compile
 > **Robustness**: IGUANA features an automatic fallback mechanism. If the native C-NIF cannot be loaded, the system seamlessly transitions to a pure Erlang functional implementation to ensure safety continuity.
 
 ### 2. Fetch Erlang dependencies and compile
-IGUANA is optimized for Erlang/OTP 26+ and uses `rebar3` for lifecycle management:
+IGUANA is optimized for Erlang/OTP 27+ and uses `rebar3` for lifecycle management:
 
 ```bash
 rebar3 get-deps
